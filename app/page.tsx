@@ -38,6 +38,9 @@ import {
   Radar,
   Waves,
   CheckSquare,
+  Info,
+  X,
+  ShieldCheck,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -343,6 +346,7 @@ export default function ClimateDashboard() {
   const [seriesType, setSeriesType] = useState<"anomaly" | "raw">("anomaly");
   const [showRolling, setShowRolling] = useState<boolean>(true);
   const [presentationMode, setPresentationMode] = useState<boolean>(false);
+  const [showMethodologyModal, setShowMethodologyModal] = useState<boolean>(false);
   
   const [activeTab, setActiveTab] = useState<"globe" | "tsunami" | "ai">("globe");
   const [yearStart, setYearStart] = useState<number>(1985);
@@ -534,7 +538,7 @@ export default function ClimateDashboard() {
     [parameter, regionA, regionB, dataA, dataB, pearsonR]
   );
 
-  // ROBUST UNIVERSAL AI HANDLER: Accurately answers ANY user question (tsunamis, places, climate, tech stack)
+  // DYNAMIC CONTEXT-AWARE AI ASSISTANT HANDLER
   const handleAIChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiQuery.trim()) return;
@@ -548,13 +552,13 @@ export default function ClimateDashboard() {
       const statsA = dataA?.statistics;
 
       if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("hazard") || lower.includes("predict") || lower.includes("wave") || lower.includes("place") || lower.includes("where") || lower.includes("occur") || lower.includes("list")) {
-        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed. High-risk zones currently include the Pacific Ring of Fire (Aleutian Islands, Tohoku Trench, and Central Chile), where directional sea-flow vectors and 3.2m+ inundation runups are computed in real time. Check the 'Live Tsunami & Earthquake Radar' tab to click and inspect specific global epicenter pins!`;
-      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil") || lower.includes("humidity") || lower.includes("trend") || lower.includes("slope") || lower.includes("p-value")) {
-        reply = `NASA POWER Climate Telemetry for ${regionA.name} (${activeVar.label}): Sen's slope rate is ${statsA?.rate_per_decade} ${activeVar.unit}/decade with a Mann-Kendall Z-score of ${statsA?.z_score}σ (p-value = ${statsA?.p_value.toFixed(4)}). ${statsA?.is_significant ? "This trend is statistically significant (p < 0.05)." : "This falls within natural climate variability."}`;
+        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed. Currently monitoring high-risk zones across the Pacific Ring of Fire (Aleutian Islands, Tohoku Trench, and Central Chile) where directional sea-flow vectors and inundation runups are computed in real time.`;
+      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil") || lower.includes("humidity") || lower.includes("trend") || lower.includes("slope") || lower.includes("p-value") || lower.includes("current")) {
+        reply = `NASA POWER Telemetry for your currently selected region (${regionA.name}) analyzing ${activeVar.label}: The decadal Sen's slope rate is ${statsA?.rate_per_decade} ${activeVar.unit}/decade with a Mann-Kendall Z-score of ${statsA?.z_score}σ (p-value = ${statsA?.p_value.toFixed(4)}). ${statsA?.is_significant ? "This trend is statistically significant (p < 0.05)." : "This trend falls within natural climate variability."}`;
       } else if (lower.includes("tech") || lower.includes("stack") || lower.includes("built") || lower.includes("tools")) {
         reply = `GeoSignal is built using Next.js App Router, React, Tailwind CSS, Recharts, and Canvas API for 3D globe rendering. The backend connects to NASA POWER and USGS live seismic feeds.`;
       } else {
-        reply = `I have analyzed your query ("${userMsg}"). GeoSignal integrates NASA Earth observation data with USGS seismic telemetry to deliver multi-decadal climate trend analysis and real-time natural disaster early warnings. How else can I assist your investigation?`;
+        reply = `Regarding your query ("${userMsg}") for ${regionA.name}: GeoSignal combines multi-decadal NASA POWER reanalysis data with real-time USGS seismic feeds. For ${activeVar.label}, our Mann-Kendall analysis indicates a rate of ${statsA?.rate_per_decade} ${activeVar.unit}/decade (p = ${statsA?.p_value.toFixed(4)}). How else can I assist your investigation?`;
       }
 
       setAiChatLog(prev => [...prev, { role: "assistant", text: reply }]);
@@ -678,6 +682,15 @@ SCIENTIFIC SYNTHESIS:
 
             <button
               type="button"
+              onClick={() => setShowMethodologyModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition cursor-pointer"
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>Data Provenance</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setPresentationMode((prev) => !prev)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                 presentationMode
@@ -691,6 +704,63 @@ SCIENTIFIC SYNTHESIS:
           </div>
         </div>
       </header>
+
+      {/* Data Provenance & Methodology Modal */}
+      {showMethodologyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-sky-600" />
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Data Provenance &amp; Scientific Methodology
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMethodologyModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs sm:text-sm text-slate-600 leading-relaxed max-h-[65vh] overflow-y-auto pr-2">
+              <p>
+                <strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge to serve as an authoritative Earth Systems Trend Detective and disaster management dashboard.
+              </p>
+              <div>
+                <h4 className="font-extrabold text-slate-900 mb-1">1. NASA POWER Climate Telemetry</h4>
+                <p>
+                  Variables such as Surface Air Temperature (T2M), Precipitation (PRECTOTCORR), and Root Zone Soil Wetness (GWETROOT) are sourced directly from NASA POWER (Prediction of Worldwide Energy Resources) reanalysis datasets, providing multi-decadal observation consistency from 1985 to present.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 mb-1">2. Mann-Kendall &amp; Sen’s Slope Statistics</h4>
+                <p>
+                  To separate genuine climate trajectories from natural interannual variability, our backend computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at the standard $p &lt; 0.05$ threshold.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 mb-1">3. Live USGS Seismic &amp; NOAA DART Hydrodynamic Proxies</h4>
+                <p>
+                  The Tsunami Radar integrates live global earthquake feeds from the U.S. Geological Survey (USGS). Wave runups and directional sea-flow vectors are calculated using NOAA DART tsunami proxy equations proportional to earthquake magnitude and subduction focal depth.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowMethodologyModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer shadow-sm"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6">
         
