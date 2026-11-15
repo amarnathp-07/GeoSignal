@@ -24,6 +24,8 @@ interface EarthGlobe3DProps {
   variableLabel: string;
   gibsLayer?: string;    
   gibsOpacity?: number;
+  showThermalHotspots?: boolean;        // Add this line
+  showOrbitingSatellites?: boolean;
   onInspectGlobalPeak?: (lat: number, lon: number, name: string) => void;
 }
 

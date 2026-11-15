@@ -56,6 +56,9 @@ import {
   VolumeX,
   Sliders,
   ShieldAlert,
+  Play,
+  Pause,
+  Satellite,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -559,7 +562,7 @@ function CrisisAlertBanner({ dataA, regionName, isDarkMode }: { dataA: AnalysisR
         <div>
           <h4 className="text-xs font-extrabold uppercase tracking-widest">Automated Climate Risk Trigger</h4>
           <p className="text-xs mt-0.5">
-            Statistical anomaly detected in <strong>{regionName}</strong>: Decadal shift of {dataA.statistics.rate_per_decade} {dataA.region.units} exceeds normal baseline variance ($p &lt; 0.05$).
+            Statistical anomaly detected in <strong>{regionName}</strong>: Decadal shift of {dataA.statistics.rate_per_decade} {dataA.region.units} exceeds normal baseline variance (p &lt; 0.05).
           </p>
         </div>
       </div>
@@ -603,6 +606,8 @@ export default function ClimateDashboard() {
   const [savedPresets, setSavedPresets] = useState<{ name: string; lat: number; lon: number; param: string }[]>([]);
 
   const [showTsunamiRings, setShowTsunamiRings] = useState<boolean>(true);
+  const [showThermalHotspots, setShowThermalHotspots] = useState<boolean>(true);
+  const [showOrbitingSatellites, setShowOrbitingSatellites] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"globe" | "tsunami" | "ai">("globe");
   const [yearStart, setYearStart] = useState<number>(1985);
   const [yearEnd, setYearEnd] = useState<number>(2025);
@@ -610,6 +615,7 @@ export default function ClimateDashboard() {
 
   const [projectionYear, setProjectionYear] = useState<number>(2050);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   const [aiQuery, setAiQuery] = useState<string>("");
@@ -636,6 +642,17 @@ export default function ClimateDashboard() {
 
   const timeA = useMemo(() => getLocalTimeForRegion(regionA.lat, regionA.lon), [regionA]);
   const timeB = useMemo(() => getLocalTimeForRegion(regionB.lat, regionB.lon), [regionB]);
+
+  // Cinematic Time-Machine Auto-Playback Mode
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isAutoPlaying) {
+      interval = setInterval(() => {
+        setYearEnd((prev) => (prev >= 2025 ? 1995 : prev + 1));
+      }, 800);
+    }
+    return () => clearInterval(interval);
+  }, [isAutoPlaying]);
 
   // Audio Soundscape Synthesizer
   const toggleSoundscape = () => {
@@ -1322,11 +1339,11 @@ export default function ClimateDashboard() {
                 </div>
               </div>
 
-              {/* Time Baseline Range & Seasonality Filters */}
+              {/* Time Baseline Range, Cinematic Playback & Seasonality Filters */}
               <div className={`flex flex-wrap items-center gap-3 border p-3 rounded-2xl ${isDarkMode ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200/80"}`}>
                 <div>
                   <span className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
-                    Baseline Window
+                    Baseline Window &amp; Cinematic Demo
                   </span>
                   <div className="flex items-center gap-2">
                     <input
@@ -1346,6 +1363,17 @@ export default function ClimateDashboard() {
                       onChange={(e) => setYearEnd(Number(e.target.value))}
                       className={`w-16 px-2 py-1 text-xs border rounded-lg text-center font-mono font-bold ${isDarkMode ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setIsAutoPlaying(prev => !prev)}
+                      title="Cinematic Time-Machine Auto-Playback for Judges"
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        isAutoPlaying ? "bg-rose-600 text-white animate-pulse" : "bg-sky-600 hover:bg-sky-500 text-white"
+                      }`}
+                    >
+                      {isAutoPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      <span>{isAutoPlaying ? "Pause" : "Cinematic Play"}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1379,7 +1407,27 @@ export default function ClimateDashboard() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setShowThermalHotspots(prev => !prev)}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                    showThermalHotspots ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "bg-slate-800 border-slate-700 text-slate-400"
+                  }`}
+                >
+                  <Flame className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
+                  <span>{showThermalHotspots ? "Thermal & Wildfire Hotspots ON" : "Hotspots OFF"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOrbitingSatellites(prev => !prev)}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                    showOrbitingSatellites ? "bg-sky-500/20 border-sky-500/40 text-sky-300" : "bg-slate-800 border-slate-700 text-slate-400"
+                  }`}
+                >
+                  <Satellite className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                  <span>{showOrbitingSatellites ? "Orbiting Satellites ON" : "Satellites OFF"}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowCoordModal(true)}
@@ -1642,6 +1690,8 @@ export default function ClimateDashboard() {
                   variableLabel={activeVar.short}
                   gibsLayer={parameter === "PM25" || parameter === "AOD" ? "aerosol" : "chlorophyll"}
                   gibsOpacity={0.8}
+                  showThermalHotspots={showThermalHotspots}
+                  showOrbitingSatellites={showOrbitingSatellites}
                   onInspectGlobalPeak={(lat, lon, peakName) => {
                     setRegionA({ name: peakName, lat, lon });
                     setActiveBiome("global-peak");
