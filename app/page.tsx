@@ -43,6 +43,11 @@ import {
   ShieldCheck,
   Printer,
   Share2,
+  Moon,
+  SunMedium,
+  BookmarkPlus,
+  Code2,
+  MapPin,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -350,6 +355,14 @@ export default function ClimateDashboard() {
   const [presentationMode, setPresentationMode] = useState<boolean>(false);
   const [showMethodologyModal, setShowMethodologyModal] = useState<boolean>(false);
   
+  // Enhancement states
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [showCoordModal, setShowCoordModal] = useState<boolean>(false);
+  const [customLat, setCustomLat] = useState<string>("13.93");
+  const [customLon, setCustomLon] = useState<string>("75.57");
+  const [customName, setCustomName] = useState<string>("Custom Lat/Lon Pin");
+  const [savedPresets, setSavedPresets] = useState<{ name: string; lat: number; lon: number; param: string }[]>([]);
+
   const [activeTab, setActiveTab] = useState<"globe" | "tsunami" | "ai">("globe");
   const [yearStart, setYearStart] = useState<number>(1985);
   const [yearEnd, setYearEnd] = useState<number>(2025);
@@ -400,6 +413,16 @@ export default function ClimateDashboard() {
         lon: parseFloat(lonB),
       });
     }
+
+    // Load saved presets from localStorage
+    const stored = localStorage.getItem("geosignal_saved_presets");
+    if (stored) {
+      try {
+        setSavedPresets(JSON.parse(stored));
+      } catch {
+        // ignore
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -432,9 +455,7 @@ export default function ClimateDashboard() {
           fetch(`/api/analyze?lat=${latB}&lon=${lonB}&parameter=${param}`),
         ]);
         if (!resA.ok || !resB.ok) {
-          throw new Error(
-            "Unable to fetch NASA POWER analytics from API route."
-          );
+          throw new Error("Unable to fetch NASA POWER analytics from API route.");
         }
         const [jsonA, jsonB]: [AnalysisResponse, AnalysisResponse] =
           await Promise.all([resA.json(), resB.json()]);
@@ -540,6 +561,14 @@ export default function ClimateDashboard() {
     setMultiScan(null);
   };
 
+  const saveCurrentPreset = () => {
+    const newItem = { name: regionA.name, lat: regionA.lat, lon: regionA.lon, param: parameter };
+    const updated = [...savedPresets, newItem];
+    setSavedPresets(updated);
+    localStorage.setItem("geosignal_saved_presets", JSON.stringify(updated));
+    alert(`Successfully bookmarked "${regionA.name}" (${parameter}) to local presets!`);
+  };
+
   const enrichedSeriesA = useMemo(
     () => computeEnrichedSeries(dataA?.time_series || [], dataA?.statistics, seasonFilter, yearStart, yearEnd),
     [dataA, seasonFilter, yearStart, yearEnd]
@@ -591,9 +620,9 @@ export default function ClimateDashboard() {
       let reply = "";
       const statsA = dataA?.statistics;
 
-      if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("hazard") || lower.includes("predict") || lower.includes("wave")) {
-        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed.`;
-      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil") || lower.includes("trend")) {
+      if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("hazard")) {
+        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed across the Pacific Ring of Fire.`;
+      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil")) {
         reply = `NASA POWER Telemetry for ${regionA.name} analyzing ${activeVar.label}: Sen's slope rate is ${statsA?.rate_per_decade} ${activeVar.unit}/decade with Mann-Kendall Z = ${statsA?.z_score}σ (p = ${statsA?.p_value.toFixed(4)}).`;
       } else {
         reply = `Regarding your query ("${userMsg}") for ${regionA.name}: GeoSignal combines multi-decadal NASA POWER reanalysis with real-time USGS seismic feeds. How else can I assist?`;
@@ -603,27 +632,39 @@ export default function ClimateDashboard() {
     }, 700);
   };
 
-  const exportCaseStudyBrief = () => {
+  const copyJsonApiUrl = () => {
+    const url = `${window.location.origin}/api/analyze?lat=${regionA.lat}&lon=${regionA.lon}&parameter=${parameter}`;
+    navigator.clipboard.writeText(url);
+    alert("NASA POWER REST API endpoint URL copied to clipboard!");
+  };
+
+  const exportMarkdownBrief = () => {
     if (!dataA || !dataB) return;
-    const text = `NASA SPACE APPS CHALLENGE — EARTH SYSTEM TREND DETECTIVE BRIEF
-=====================================================================
-Variable Analyzed : ${activeVar.label} (${parameter})
-Observation Window: ${yearStart}–${yearEnd}
-Cross-Region Link : Pearson r = ${pearsonR}
+    const md = `# GeoSignal Executive Brief — NASA Space Apps Challenge
+**Variable:** ${activeVar.label} (${parameter})  
+**Observation Window:** ${yearStart}–${yearEnd}  
+**Cross-Region Pearson Correlation (r):** ${pearsonR}
 
-REGION A: ${regionA.name}
-- Decadal Rate: ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec
-- Mann-Kendall Z: ${dataA.statistics.z_score}, p = ${dataA.statistics.p_value}
+## Region A: ${regionA.name} (${regionA.lat}°, ${regionA.lon}°)
+- **Decadal Rate:** ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec
+- **Mann-Kendall Z-Score:** ${dataA.statistics.z_score}σ (p = ${dataA.statistics.p_value})
+- **Significance:** ${dataA.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}
 
-REGION B: ${regionB.name}
-- Decadal Rate: ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec
-- Mann-Kendall Z: ${dataB.statistics.z_score}, p = ${dataB.statistics.p_value}
+## Region B: ${regionB.name} (${regionB.lat}°, ${regionB.lon}°)
+- **Decadal Rate:** ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec
+- **Mann-Kendall Z-Score:** ${dataB.statistics.z_score}σ (p = ${dataB.statistics.p_value})
+- **Significance:** ${dataB.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}
+
+## Scientific Synthesis
+> ${synthesis.headline}  
+> *Mechanism:* ${synthesis.mechanism}  
+> *Recommended Next Step:* ${synthesis.nextStep}
 `;
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `NASA_Trend_Brief_${parameter}.txt`;
+    a.download = `GeoSignal_Brief_${parameter}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -729,123 +770,163 @@ REGION B: ${regionB.name}
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans selection:bg-sky-100 selection:text-sky-900 pt-2">
+    <div className={`min-h-screen font-sans selection:bg-sky-100 selection:text-sky-900 pt-2 transition-colors duration-300 ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafc] text-slate-900"}`}>
       
       {/* Top Daylight Glass Navigation */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 py-3.5 shadow-xs">
+      <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-4 sm:px-8 py-3.5 shadow-xs transition-colors duration-300 ${isDarkMode ? "bg-slate-900/90 border-slate-800 text-white" : "bg-white/90 border-slate-200/80 text-slate-900"}`}>
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-sm">
               <Globe2 className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
+              <h1 className="text-base sm:text-lg font-extrabold tracking-tight">
                 GeoSignal — Earth System Trend Detective
               </h1>
-              <p className="text-xs text-slate-500">
+              <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
                 Multi-Decadal Satellite Telemetry, Mann-Kendall Statistics &amp; Disaster Early Warning
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+            <div className={`flex p-1 rounded-xl text-xs font-bold ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`}>
               <button
                 type="button"
                 onClick={() => setActiveTab("globe")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "globe" ? "bg-white text-sky-700 shadow-sm" : "text-slate-600"}`}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "globe" ? (isDarkMode ? "bg-slate-700 text-sky-400 shadow-sm" : "bg-white text-sky-700 shadow-sm") : (isDarkMode ? "text-slate-400" : "text-slate-600")}`}
               >
                 3D Globe View
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("tsunami")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer ${activeTab === "tsunami" ? "bg-rose-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer ${activeTab === "tsunami" ? "bg-rose-600 text-white shadow-sm" : (isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900")}`}
               >
                 <Waves className="w-3.5 h-3.5" /> Tsunami Radar
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("ai")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer ${activeTab === "ai" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer ${activeTab === "ai" ? "bg-emerald-600 text-white shadow-sm" : (isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900")}`}
               >
                 <Sparkles className="w-3.5 h-3.5" /> AI Assistant
               </button>
             </div>
 
+            {/* Dark Mode Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsDarkMode((prev) => !prev)}
+              title="Toggle Dark / Light Mode"
+              className={`p-2.5 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 text-amber-400" : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"}`}
+            >
+              {isDarkMode ? <SunMedium className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {/* Save Preset Bookmark Button */}
+            <button
+              type="button"
+              onClick={saveCurrentPreset}
+              title="Bookmark current region & variable"
+              className={`p-2.5 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 text-sky-400" : "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100"}`}
+            >
+              <BookmarkPlus className="w-4 h-4" />
+            </button>
+
             <button
               type="button"
               onClick={copyShareLink}
               title="Copy shareable deep-link URL"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"}`}
             >
-              <Share2 className="w-3.5 h-3.5 text-slate-600" />
-              <span>Share Link</span>
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowMethodologyModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition cursor-pointer"
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-sky-950 border-sky-800 text-sky-300" : "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100"}`}
             >
               <Info className="w-3.5 h-3.5" />
-              <span>Data Provenance</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPresentationMode((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                presentationMode
-                  ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              <Presentation className="w-3.5 h-3.5" />
-              <span>{presentationMode ? "Exit Pitch View" : "Pitch View"}</span>
+              <span>Provenance</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Data Provenance & Methodology Modal */}
-      {showMethodologyModal && (
+      {/* Custom Coordinates Input Modal */}
+      {showCoordModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 relative">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-sky-600" />
-                <h3 className="text-base font-extrabold text-slate-900">
-                  Data Provenance &amp; Scientific Methodology
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowMethodologyModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer"
-              >
+          <div className={`${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"} rounded-3xl max-w-md w-full p-6 shadow-2xl border space-y-4`}>
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-sm font-extrabold flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-sky-500" /> Enter Custom Lat / Lon Pin
+              </h3>
+              <button type="button" onClick={() => setShowCoordModal(false)} className="w-7 h-7 rounded-full bg-slate-800/20 flex items-center justify-center cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3 text-xs sm:text-sm text-slate-600 leading-relaxed max-h-[65vh] overflow-y-auto pr-2">
-              <p><strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge.</p>
+            <div className="space-y-3 text-xs">
               <div>
-                <h4 className="font-extrabold text-slate-900 mb-1">1. NASA POWER Climate Telemetry</h4>
-                <p>Sourced directly from NASA POWER reanalysis datasets, providing multi-decadal observation consistency from 1985 to present.</p>
+                <label className="block font-bold mb-1">Pin Name / Location</label>
+                <input type="text" value={customName} onChange={(e) => setCustomName(e.target.value)} className={`w-full p-2.5 rounded-xl border ${isDarkMode ? "bg-slate-950 border-slate-700 text-white" : "bg-slate-50 border-slate-300 text-slate-900"}`} />
               </div>
-              <div>
-                <h4 className="font-extrabold text-slate-900 mb-1">2. Mann-Kendall Statistics</h4>
-                <p>Computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at p &lt; 0.05.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Latitude (-90 to 90)</label>
+                  <input type="number" step="0.01" value={customLat} onChange={(e) => setCustomLat(e.target.value)} className={`w-full p-2.5 rounded-xl border ${isDarkMode ? "bg-slate-950 border-slate-700 text-white" : "bg-slate-50 border-slate-300 text-slate-900"}`} />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Longitude (-180 to 180)</label>
+                  <input type="number" step="0.01" value={customLon} onChange={(e) => setCustomLon(e.target.value)} className={`w-full p-2.5 rounded-xl border ${isDarkMode ? "bg-slate-950 border-slate-700 text-white" : "bg-slate-50 border-slate-300 text-slate-900"}`} />
+                </div>
               </div>
             </div>
-            <div className="pt-3 border-t border-slate-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowMethodologyModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer"
-              >
-                Got It
+            <div className="pt-3 border-t flex justify-end gap-2">
+              <button type="button" onClick={() => setShowCoordModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-500/20 cursor-pointer">Cancel</button>
+              <button type="button" onClick={() => {
+                const latNum = parseFloat(customLat);
+                const lonNum = parseFloat(customLon);
+                if (!isNaN(latNum) && !isNaN(lonNum)) {
+                  setRegionA({ name: customName, lat: latNum, lon: lonNum });
+                  setShowCoordModal(false);
+                } else {
+                  alert("Please enter valid latitude and longitude numbers.");
+                }
+              }} className="px-5 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer">Apply Pin A</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Data Provenance & Methodology Modal */}
+      {showMethodologyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"} rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border space-y-4`}>
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-sky-600" />
+                <h3 className="text-base font-extrabold">Data Provenance &amp; Scientific Methodology</h3>
+              </div>
+              <button type="button" onClick={() => setShowMethodologyModal(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center cursor-pointer">
+                <X className="w-4 h-4" />
               </button>
+            </div>
+            <div className="space-y-3 text-xs sm:text-sm leading-relaxed max-h-[65vh] overflow-y-auto pr-2">
+              <p><strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge to serve as an authoritative Earth Systems Trend Detective and disaster management dashboard.</p>
+              <div>
+                <h4 className="font-extrabold mb-1">1. NASA POWER Climate Telemetry</h4>
+                <p>Variables such as Surface Air Temperature (T2M), Precipitation (PRECTOTCORR), and Root Zone Soil Wetness (GWETROOT) are sourced directly from NASA POWER reanalysis datasets from 1985 to present.</p>
+              </div>
+              <div>
+                <h4 className="font-extrabold mb-1">2. Mann-Kendall &amp; Sen’s Slope Statistics</h4>
+                <p>Computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at the standard $p &lt; 0.05$ threshold.</p>
+              </div>
+            </div>
+            <div className="pt-3 border-t flex justify-end">
+              <button type="button" onClick={() => setShowMethodologyModal(false)} className="px-5 py-2.5 rounded-xl bg-sky-600 text-white font-bold text-xs cursor-pointer">Got It</button>
             </div>
           </div>
         </div>
@@ -853,8 +934,8 @@ REGION B: ${regionB.name}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6">
         
-        {/* Workflow Status Bar */}
-        <section className="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white rounded-3xl p-5 shadow-lg border border-slate-700">
+        {/* Explicit 5-Step Trend Detective Workflow Bar */}
+        <section className={`rounded-3xl p-5 shadow-lg border ${isDarkMode ? "bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 border-slate-700 text-white" : "bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white border-slate-700"}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <CheckSquare className="w-4 h-4 text-sky-400" />
@@ -897,9 +978,9 @@ REGION B: ${regionB.name}
           </div>
         </section>
 
-        {/* Control Bar */}
+        {/* Control Bar: Variable Pills + Time Baseline Sliders + Seasonality Filters */}
         {!presentationMode && (
-          <section className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs space-y-5">
+          <section className={`rounded-3xl border p-5 shadow-2xs space-y-5 transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"}`}>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -917,7 +998,7 @@ REGION B: ${regionB.name}
                         className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
                           active
                             ? "bg-sky-600 text-white border-sky-600 shadow-sm"
-                            : "bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100"
+                            : isDarkMode ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700" : "bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100"
                         }`}
                       >
                         <Icon className="w-3.5 h-3.5" />
@@ -929,7 +1010,7 @@ REGION B: ${regionB.name}
               </div>
 
               {/* Time Baseline Range & Seasonality Filters */}
-              <div className="flex flex-wrap items-center gap-3 bg-slate-50 border border-slate-200/80 p-3 rounded-2xl">
+              <div className={`flex flex-wrap items-center gap-3 border p-3 rounded-2xl ${isDarkMode ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200/80"}`}>
                 <div>
                   <span className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
                     Baseline Window
@@ -941,7 +1022,7 @@ REGION B: ${regionB.name}
                       max="2020"
                       value={yearStart}
                       onChange={(e) => setYearStart(Number(e.target.value))}
-                      className="w-16 px-2 py-1 text-xs bg-white border border-slate-300 rounded-lg text-center font-mono font-bold"
+                      className={`w-16 px-2 py-1 text-xs border rounded-lg text-center font-mono font-bold ${isDarkMode ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
                     />
                     <span className="text-slate-400 text-xs">to</span>
                     <input
@@ -950,7 +1031,7 @@ REGION B: ${regionB.name}
                       max="2025"
                       value={yearEnd}
                       onChange={(e) => setYearEnd(Number(e.target.value))}
-                      className="w-16 px-2 py-1 text-xs bg-white border border-slate-300 rounded-lg text-center font-mono font-bold"
+                      className={`w-16 px-2 py-1 text-xs border rounded-lg text-center font-mono font-bold ${isDarkMode ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
                     />
                   </div>
                 </div>
@@ -959,25 +1040,25 @@ REGION B: ${regionB.name}
                   <span className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
                     Season Filter
                   </span>
-                  <div className="flex rounded-lg bg-slate-200 p-0.5 text-[11px] font-bold">
+                  <div className={`flex rounded-lg p-0.5 text-[11px] font-bold ${isDarkMode ? "bg-slate-800" : "bg-slate-200"}`}>
                     <button
                       type="button"
                       onClick={() => setSeasonFilter("all")}
-                      className={`px-2.5 py-1 rounded-md transition ${seasonFilter === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"}`}
+                      className={`px-2.5 py-1 rounded-md transition ${seasonFilter === "all" ? (isDarkMode ? "bg-slate-700 text-white shadow-xs" : "bg-white text-slate-900 shadow-xs") : "text-slate-400"}`}
                     >
                       All
                     </button>
                     <button
                       type="button"
                       onClick={() => setSeasonFilter("summer")}
-                      className={`px-2.5 py-1 rounded-md transition ${seasonFilter === "summer" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"}`}
+                      className={`px-2.5 py-1 rounded-md transition ${seasonFilter === "summer" ? (isDarkMode ? "bg-slate-700 text-white shadow-xs" : "bg-white text-slate-900 shadow-xs") : "text-slate-400"}`}
                     >
                       Summer
                     </button>
                     <button
                       type="button"
                       onClick={() => setSeasonFilter("winter")}
-                      className={`px-2.5 py-1 rounded-md transition ${seasonFilter === "winter" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"}`}
+                      className={`px-2.5 py-1 rounded-md transition ${seasonFilter === "winter" ? (isDarkMode ? "bg-slate-700 text-white shadow-xs" : "bg-white text-slate-900 shadow-xs") : "text-slate-400"}`}
                     >
                       Winter
                     </button>
@@ -985,25 +1066,31 @@ REGION B: ${regionB.name}
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={runAllVariablesScan}
-                disabled={scanningAll}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition shadow-xs disabled:opacity-60 cursor-pointer"
-              >
-                <Radar className="w-4 h-4 text-sky-400" />
-                <span>
-                  {scanningAll
-                    ? "Scanning All 5 Variables..."
-                    : `Scan All Variables (${regionA.name.split(",")[0]})`}
-                </span>
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCoordModal(true)}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 text-sky-400" : "bg-white border-slate-200 text-slate-700"}`}
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Custom Lat/Lon</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={runAllVariablesScan}
+                  disabled={scanningAll}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition shadow-xs disabled:opacity-60 cursor-pointer"
+                >
+                  <Radar className="w-4 h-4 text-sky-400" />
+                  <span>{scanningAll ? "Scanning..." : "Scan All Variables"}</span>
+                </button>
+              </div>
             </div>
 
-            <p className="text-xs text-slate-500">{activeVar.description}</p>
+            <p className="text-xs text-slate-400">{activeVar.description}</p>
 
             {/* Curated Biome Dipole Case Studies */}
-            <div className="pt-3 border-t border-slate-100">
+            <div className="pt-3 border-t border-slate-800">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Launch a Curated Climate Dipole Case Study
               </span>
@@ -1017,19 +1104,15 @@ REGION B: ${regionB.name}
                       onClick={() => applyBiomePreset(preset)}
                       className={`text-left p-3.5 rounded-2xl border transition cursor-pointer ${
                         selected
-                          ? "bg-sky-50/70 border-sky-400 ring-2 ring-sky-500/15"
-                          : "bg-slate-50/60 border-slate-200/80 hover:bg-white hover:border-slate-300"
+                          ? "bg-sky-500/10 border-sky-400 ring-2 ring-sky-500/15"
+                          : isDarkMode ? "bg-slate-950/60 border-slate-800 hover:border-slate-700" : "bg-slate-50/60 border-slate-200/80 hover:bg-white"
                       }`}
                     >
-                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white text-sky-700 border border-sky-100">
+                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-sky-500/20 text-sky-400 border border-sky-500/30">
                         {preset.category}
                       </span>
-                      <p className="text-sm font-extrabold text-slate-900 mt-1.5">
-                        {preset.title}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {preset.question}
-                      </p>
+                      <p className="text-sm font-extrabold mt-1.5">{preset.title}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{preset.question}</p>
                     </button>
                   );
                 })}
@@ -1038,19 +1121,37 @@ REGION B: ${regionB.name}
           </section>
         )}
 
+        {/* Saved Presets Bar */}
+        {savedPresets.length > 0 && (
+          <div className={`p-4 rounded-2xl border flex items-center gap-2 overflow-x-auto ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <span className="text-xs font-bold text-sky-400 shrink-0">Bookmarked Presets:</span>
+            {savedPresets.map((p, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  setRegionA({ name: p.name, lat: p.lat, lon: p.lon });
+                  setParameter(p.param);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono border whitespace-nowrap transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 hover:bg-slate-700" : "bg-slate-100 border-slate-200 hover:bg-slate-200"}`}
+              >
+                📍 {p.name} ({p.param})
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Multi-Variable Significance Ranking Drawer */}
         {multiScan && (
-          <section className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs">
+          <section className={`rounded-3xl border p-5 shadow-2xs ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"}`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-sky-600" />
-                <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                <h2 className="text-xs font-extrabold uppercase tracking-wider">
                   Multi-Variable Significance Ranking for {regionA.name}
                 </h2>
               </div>
-              <span className="text-[11px] text-slate-400">
-                Click any card to load into charts
-              </span>
+              <span className="text-[11px] text-slate-400">Click any card to load into charts</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
               {multiScan.map((item, idx) => (
@@ -1060,78 +1161,62 @@ REGION B: ${regionB.name}
                   onClick={() => setParameter(item.parameter)}
                   className={`text-left p-3.5 rounded-2xl border transition cursor-pointer ${
                     parameter === item.parameter
-                      ? "bg-sky-50/80 border-sky-400"
-                      : "bg-slate-50/50 border-slate-200/80 hover:bg-white"
+                      ? "bg-sky-500/15 border-sky-400"
+                      : isDarkMode ? "bg-slate-950 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-200 hover:bg-white"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-400">
-                      #{idx + 1}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        item.is_significant
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
+                    <span className="text-[11px] font-bold text-slate-400">#{idx + 1}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${item.is_significant ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-800 text-slate-400"}`}>
                       {item.is_significant ? "SIGNIFICANT" : "NOISE"}
                     </span>
                   </div>
-                  <p className="text-xs font-extrabold text-slate-900 mt-1.5 truncate">
-                    {item.label}
+                  <p className="text-xs font-extrabold mt-1.5 truncate">{item.label}</p>
+                  <p className="text-sm font-mono font-extrabold text-sky-400 mt-1">
+                    {item.rate > 0 ? "+" : ""}{item.rate} {item.unit}/dec
                   </p>
-                  <p className="text-sm font-mono font-extrabold text-sky-700 mt-1">
-                    {item.rate > 0 ? "+" : ""}
-                    {item.rate} {item.unit}/dec
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    p = {item.p_value.toFixed(4)} • Z = {item.z_score}σ
-                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">p = {item.p_value.toFixed(4)} • Z = {item.z_score}σ</p>
                 </button>
               ))}
             </div>
           </section>
         )}
 
-        {/* Hero Spatial Stage: 3D Globe & Original Interactive World Map */}
-        <section
-          ref={globeSectionRef}
-          className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"
-        >
+        {/* Hero Spatial Stage: Instant Tab Switcher */}
+        <section ref={globeSectionRef} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           <div className="lg:col-span-12 flex flex-col">
             
-            <div className="flex bg-slate-200 p-1.5 rounded-2xl w-fit mb-4 text-xs font-bold">
+            <div className={`flex p-1.5 rounded-2xl w-fit mb-4 text-xs font-bold ${isDarkMode ? "bg-slate-800" : "bg-slate-200"}`}>
               <button
                 type="button"
                 onClick={() => setActiveTab("globe")}
-                className={`px-4 py-2 rounded-xl transition cursor-pointer ${activeTab === "globe" ? "bg-white text-sky-700 shadow-sm" : "text-slate-600"}`}
+                className={`px-4 py-2 rounded-xl transition cursor-pointer ${activeTab === "globe" ? (isDarkMode ? "bg-slate-700 text-sky-400 shadow-sm" : "bg-white text-sky-700 shadow-sm") : "text-slate-400"}`}
               >
                 3D Climate Globe View
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("tsunami")}
-                className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "tsunami" ? "bg-rose-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "tsunami" ? "bg-rose-600 text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
               >
-                <Waves className="w-4 h-4" /> Live Tsunami Radar
+                <Waves className="w-4 h-4" /> Live Tsunami &amp; Earthquake Radar
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("ai")}
-                className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "ai" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "ai" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
               >
-                <Sparkles className="w-4 h-4" /> AI Assistant
+                <Sparkles className="w-4 h-4" /> GeoSignal AI Assistant
               </button>
             </div>
 
-            {/* Tsunami Radar Tab */}
-            <div className={`bg-white text-slate-900 rounded-3xl p-8 border border-slate-200/90 flex-col justify-between shadow-2xs ${activeTab === "tsunami" ? "flex" : "hidden"}`}>
+            {/* Live USGS Seismic Tsunami Radar Tab */}
+            <div className={`rounded-3xl p-8 border flex-col justify-between shadow-2xs ${activeTab === "tsunami" ? "flex" : "hidden"} ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
               <div className="flex items-center justify-between mb-4">
-                <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-rose-600">
+                <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-rose-500">
                   <Waves className="w-5 h-5 animate-bounce" /> Real-Time USGS Global Seismic &amp; Tsunami Early Warning Radar
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-mono bg-rose-50 text-rose-700 border border-rose-200">
+                <span className="px-3 py-1 rounded-full text-xs font-mono bg-rose-500/20 text-rose-400 border border-rose-500/30">
                   USGS Feed Active
                 </span>
               </div>
@@ -1139,7 +1224,7 @@ REGION B: ${regionB.name}
             </div>
 
             {/* AI Assistant Tab */}
-            <div className={`bg-slate-950 text-white rounded-3xl p-8 border border-slate-800 flex-col justify-between shadow-2xl ${activeTab === "ai" ? "flex" : "hidden"}`}>
+            <div className={`rounded-3xl p-8 border flex-col justify-between shadow-2xl ${activeTab === "ai" ? "flex" : "hidden"} ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-slate-950 border-slate-800 text-white"}`}>
               <div className="flex items-center justify-between mb-4">
                 <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-emerald-400">
                   <Sparkles className="w-5 h-5" /> GeoSignal AI Climate &amp; Trend Assistant
@@ -1160,7 +1245,7 @@ REGION B: ${regionB.name}
                   type="text"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="Ask anything about tsunamis, earthquakes, climate trends..."
+                  placeholder="Ask anything about tsunamis, earthquakes, climate trends, p-values..."
                   className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
                 <button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3 rounded-xl text-xs transition cursor-pointer">
@@ -1169,9 +1254,9 @@ REGION B: ${regionB.name}
               </form>
             </div>
 
-            {/* 3D Globe Tab with Original WorldMap */}
+            {/* 3D Globe & Map Tab */}
             <div className={`grid-cols-1 lg:grid-cols-12 gap-6 items-stretch ${activeTab === "globe" ? "grid" : "hidden"}`}>
-              <div className="lg:col-span-6">
+              <div className="lg:col-span-6 relative">
                 <EarthGlobe3D
                   parameter={parameter}
                   regionA={regionA}
@@ -1190,20 +1275,20 @@ REGION B: ${regionB.name}
                 />
               </div>
 
-              <div className="lg:col-span-6 bg-white rounded-3xl border border-slate-200/90 p-4 shadow-2xs flex flex-col justify-between space-y-3">
+              <div className={`rounded-3xl border p-4 shadow-2xs flex flex-col justify-between space-y-3 lg:col-span-6 ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"}`}>
                 <div className="relative z-30 flex flex-wrap items-center gap-2">
-                  <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
+                  <div className={`flex rounded-xl p-1 text-xs font-bold ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`}>
                     <button
                       type="button"
                       onClick={() => setSearchTarget("A")}
-                      className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${searchTarget === "A" ? "bg-white text-sky-700 shadow-2xs" : "text-slate-500"}`}
+                      className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${searchTarget === "A" ? (isDarkMode ? "bg-slate-700 text-sky-400 shadow-2xs" : "bg-white text-sky-700 shadow-2xs") : "text-slate-400"}`}
                     >
                       Pin A
                     </button>
                     <button
                       type="button"
                       onClick={() => setSearchTarget("B")}
-                      className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${searchTarget === "B" ? "bg-white text-rose-600 shadow-2xs" : "text-slate-500"}`}
+                      className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${searchTarget === "B" ? (isDarkMode ? "bg-slate-700 text-rose-400 shadow-2xs" : "bg-white text-rose-600 shadow-2xs") : "text-slate-400"}`}
                     >
                       Pin B
                     </button>
@@ -1216,18 +1301,18 @@ REGION B: ${regionB.name}
                       value={searchQuery}
                       onChange={(e) => handleSearchInput(e.target.value)}
                       placeholder={`Search city for Pin ${searchTarget}...`}
-                      className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                      className={`w-full pl-8 pr-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 ${isDarkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`}
                     />
                     {searchResults.length > 0 && (
-                      <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-50">
+                      <div className={`absolute left-0 right-0 mt-1 border rounded-2xl shadow-lg overflow-hidden z-50 ${isDarkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
                         {searchResults.map((city) => (
                           <button
                             key={city.id}
                             type="button"
                             onClick={() => selectCity(city)}
-                            className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-sky-50 flex items-center justify-between border-b border-slate-100 last:border-0 cursor-pointer"
+                            className={`w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between border-b last:border-0 cursor-pointer ${isDarkMode ? "hover:bg-slate-800 border-slate-800" : "hover:bg-sky-50 border-slate-100"}`}
                           >
-                            <span className="font-bold text-slate-800">
+                            <span className="font-bold">
                               {city.name}{city.admin1 ? `, ${city.admin1}` : ""}, {city.country}
                             </span>
                           </button>
@@ -1237,7 +1322,7 @@ REGION B: ${regionB.name}
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-[380px] rounded-2xl overflow-hidden border border-slate-200/80">
+                <div className={`flex-1 min-h-[380px] rounded-2xl overflow-hidden border ${isDarkMode ? "border-slate-800" : "border-slate-200/80"}`}>
                   <WorldMap
                     regionA={regionA}
                     regionB={regionB}
@@ -1259,118 +1344,79 @@ REGION B: ${regionB.name}
         </section>
 
         {/* Scientific Synthesis & Action Toolbar */}
-        <section
-          ref={chartsSectionRef}
-          className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-        >
+        <section ref={chartsSectionRef} className={`rounded-3xl border p-5 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"}`}>
           <div className="space-y-1.5 max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-sky-700">
-                <Sparkles className="w-3.5 h-3.5" />
-                Scientific Synthesis
+              <span className="inline-flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-sky-500">
+                <Sparkles className="w-3.5 h-3.5" /> Scientific Synthesis
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-slate-100 text-slate-700">
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold ${isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>
                 PEARSON R = {pearsonR}
               </span>
             </div>
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-              {synthesis.headline}
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            <h2 className="text-base sm:text-lg font-extrabold">{synthesis.headline}</h2>
+            <p className={`text-xs sm:text-sm leading-relaxed ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
               {synthesis.mechanism}{" "}
-              <span className="font-bold text-sky-700">
-                Next Step: {synthesis.nextStep}
-              </span>
+              <span className="font-bold text-sky-400">Next Step: {synthesis.nextStep}</span>
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
+            <div className={`flex rounded-xl p-1 text-xs font-bold ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`}>
               <button
                 type="button"
                 onClick={() => setChartMode("split")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  chartMode === "split"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${chartMode === "split" ? (isDarkMode ? "bg-slate-700 text-white shadow-2xs" : "bg-white text-slate-900 shadow-2xs") : "text-slate-400"}`}
               >
-                <Columns2 className="w-3.5 h-3.5" />
-                <span>Split View</span>
+                <Columns2 className="w-3.5 h-3.5" /> <span>Split</span>
               </button>
               <button
                 type="button"
                 onClick={() => setChartMode("overlay")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  chartMode === "overlay"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${chartMode === "overlay" ? (isDarkMode ? "bg-slate-700 text-white shadow-2xs" : "bg-white text-slate-900 shadow-2xs") : "text-slate-400"}`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Overlay</span>
-              </button>
-            </div>
-
-            <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setSeriesType("anomaly")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  seriesType === "anomaly"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
-              >
-                Anomalies
-              </button>
-              <button
-                type="button"
-                onClick={() => setSeriesType("raw")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  seriesType === "raw"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
-              >
-                Raw Cycles
+                <Layers className="w-3.5 h-3.5" /> <span>Overlay</span>
               </button>
             </div>
 
             <button
               type="button"
-              onClick={() => setShowRolling((prev) => !prev)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                showRolling
-                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                  : "bg-white text-slate-600 border-slate-200"
-              }`}
+              onClick={copyJsonApiUrl}
+              title="Copy JSON REST API Endpoint"
+              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 text-sky-400" : "bg-white border-slate-200 text-slate-700"}`}
             >
-              12m Trend
+              <Code2 className="w-3.5 h-3.5" /> API
+            </button>
+
+            <button
+              type="button"
+              onClick={exportMarkdownBrief}
+              title="Export Markdown Brief"
+              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-white border-slate-200 text-slate-700"}`}
+            >
+              <FileText className="w-3.5 h-3.5 text-sky-500" /> MD
             </button>
 
             <button
               type="button"
               onClick={exportPDFReport}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-sky-600 text-white hover:bg-sky-500 transition cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white transition cursor-pointer shadow-xs"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>PDF Brief</span>
+              <Printer className="w-3.5 h-3.5" /> PDF
             </button>
 
             <button
               type="button"
               onClick={exportMergedCSV}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition cursor-pointer"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${isDarkMode ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-white border-slate-200 text-slate-700"}`}
             >
-              <Download className="w-3.5 h-3.5 text-emerald-600" />
-              <span>CSV</span>
+              <Download className="w-3.5 h-3.5 text-emerald-500" /> CSV
             </button>
           </div>
         </section>
 
         {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl p-4 flex items-center gap-3 text-xs font-semibold">
+          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl p-4 flex items-center gap-3 text-xs font-semibold">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -1380,100 +1426,42 @@ REGION B: ${regionB.name}
         {loading ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {[0, 1].map((idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-3xl border border-slate-200/80 p-6 h-[380px] animate-pulse space-y-4"
-              >
-                <div className="h-5 w-48 bg-slate-100 rounded-lg" />
-                <div className="h-10 w-32 bg-slate-100 rounded-xl" />
-                <div className="h-56 w-full bg-slate-50 rounded-2xl" />
-              </div>
+              <div key={idx} className={`rounded-3xl border p-6 h-[380px] animate-pulse space-y-4 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200/80"}`} />
             ))}
           </div>
         ) : (
-          dataA &&
-          dataB && (
+          dataA && dataB && (
             <>
               {chartMode === "overlay" ? (
-                <section className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+                <section className={`rounded-3xl border p-6 shadow-2xs space-y-4 ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h3 className="text-base font-extrabold text-slate-900">
+                      <h3 className="text-base font-extrabold">
                         Direct Teleconnection Overlay: {regionA.name} vs. {regionB.name}
                       </h3>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-slate-400">
                         12-month smoothed anomalies &amp; linear trendlines on a unified axis (Pearson r = {pearsonR})
                       </p>
                     </div>
                     <div className="flex items-center gap-4 text-xs font-mono font-bold">
-                      <span className="text-sky-600">
-                        A: {dataA.statistics.rate_per_decade > 0 ? "+" : ""}
-                        {dataA.statistics.rate_per_decade} {activeVar.unit}/dec
-                      </span>
-                      <span className="text-rose-600">
-                        B: {dataB.statistics.rate_per_decade > 0 ? "+" : ""}
-                        {dataB.statistics.rate_per_decade} {activeVar.unit}/dec
-                      </span>
+                      <span className="text-sky-400">A: {dataA.statistics.rate_per_decade > 0 ? "+" : ""}{dataA.statistics.rate_per_decade} {activeVar.unit}/dec</span>
+                      <span className="text-rose-400">B: {dataB.statistics.rate_per_decade > 0 ? "+" : ""}{dataB.statistics.rate_per_decade} {activeVar.unit}/dec</span>
                     </div>
                   </div>
 
                   <div className="h-[360px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={overlaySeries}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#e2e8f0"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="year"
-                          tick={{ fontSize: 11, fill: "#64748b" }}
-                          minTickGap={35}
-                        />
-                        <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: "16px",
-                            border: "1px solid #e2e8f0",
-                            fontSize: "12px",
-                          }}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#e2e8f0"} vertical={false} />
+                        <XAxis dataKey="year" tick={{ fontSize: 11, fill: isDarkMode ? "#94a3b8" : "#64748b" }} minTickGap={35} />
+                        <YAxis tick={{ fontSize: 11, fill: isDarkMode ? "#94a3b8" : "#64748b" }} />
+                        <Tooltip contentStyle={{ borderRadius: "16px", backgroundColor: isDarkMode ? "#0f172a" : "#fff", border: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", fontSize: "12px" }} />
                         <Legend wrapperStyle={{ fontSize: "12px" }} />
                         <ReferenceLine y={0} stroke="#94a3b8" />
-                        <Line
-                          type="monotone"
-                          dataKey="rollingA"
-                          name={`Region A 12m Anomaly (${regionA.name})`}
-                          stroke="#0284c7"
-                          strokeWidth={2.2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="trendA"
-                          name="Region A Linear Trend"
-                          stroke="#0284c7"
-                          strokeDasharray="5 5"
-                          strokeWidth={1.8}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="rollingB"
-                          name={`Region B 12m Anomaly (${regionB.name})`}
-                          stroke="#e11d48"
-                          strokeWidth={2.2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="trendB"
-                          name="Region B Linear Trend"
-                          stroke="#e11d48"
-                          strokeDasharray="5 5"
-                          strokeWidth={1.8}
-                          dot={false}
-                        />
+                        <Line type="monotone" dataKey="rollingA" name={`Region A (${regionA.name})`} stroke="#0ea5e9" strokeWidth={2.2} dot={false} />
+                        <Line type="monotone" dataKey="trendA" name="Region A Trend" stroke="#0ea5e9" strokeDasharray="5 5" strokeWidth={1.8} dot={false} />
+                        <Line type="monotone" dataKey="rollingB" name={`Region B (${regionB.name})`} stroke="#f43f5e" strokeWidth={2.2} dot={false} />
+                        <Line type="monotone" dataKey="trendB" name="Region B Trend" stroke="#f43f5e" strokeDasharray="5 5" strokeWidth={1.8} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -1481,196 +1469,64 @@ REGION B: ${regionB.name}
               ) : (
                 <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {[
-                    {
-                      tag: "REGION A",
-                      region: regionA,
-                      data: dataA,
-                      series: enrichedSeriesA,
-                      accent: "#0284c7",
-                    },
-                    {
-                      tag: "REGION B",
-                      region: regionB,
-                      data: dataB,
-                      series: enrichedSeriesB,
-                      accent: "#e11d48",
-                    },
+                    { tag: "REGION A", region: regionA, data: dataA, series: enrichedSeriesA, accent: "#0ea5e9" },
+                    { tag: "REGION B", region: regionB, data: dataB, series: enrichedSeriesB, accent: "#f43f5e" },
                   ].map((panel) => {
                     const stats = panel.data.statistics;
                     const positive = stats.rate_per_decade >= 0;
                     return (
-                      <div
-                        key={panel.tag}
-                        className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-4"
-                      >
+                      <div key={panel.tag} className={`rounded-3xl border p-6 shadow-2xs space-y-4 ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span
-                                className="px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white"
-                                style={{ backgroundColor: panel.accent }}
-                              >
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white" style={{ backgroundColor: panel.accent }}>
                                 {panel.tag}
                               </span>
-                              <span className="text-xs font-mono text-slate-400">
-                                {panel.region.lat}°, {panel.region.lon}°
-                              </span>
+                              <span className="text-xs font-mono text-slate-400">{panel.region.lat}°, {panel.region.lon}°</span>
                             </div>
-                            <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                              {panel.region.name}
-                            </h3>
+                            <h3 className="text-base font-extrabold mt-1">{panel.region.name}</h3>
                           </div>
-
-                          <div
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                              stats.is_significant
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
-                            }`}
-                          >
+                          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${stats.is_significant ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30"}`}>
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>
-                              {stats.is_significant
-                                ? "Statistically Significant (p < 0.05)"
-                                : "Natural Variability (p >= 0.05)"}
-                            </span>
+                            <span>{stats.is_significant ? "Significant (p < 0.05)" : "Natural Variability"}</span>
                           </div>
                         </div>
 
-                        {/* Metric KPI Strip */}
-                        <div className="grid grid-cols-3 gap-3 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
+                        <div className={`grid grid-cols-3 gap-3 rounded-2xl p-3.5 border ${isDarkMode ? "bg-slate-950 border-slate-800" : "bg-slate-50/80 border-slate-100"}`}>
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-slate-400">
-                              Decadal Rate
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Decadal Rate</p>
+                            <p className="text-base sm:text-lg font-mono font-extrabold flex items-center gap-1 mt-0.5">
+                              {positive ? <TrendingUp className="w-4 h-4 text-rose-500" /> : <TrendingDown className="w-4 h-4 text-sky-400" />}
+                              {positive ? "+" : ""}{stats.rate_per_decade}
                             </p>
-                            <p className="text-base sm:text-lg font-mono font-extrabold text-slate-900 flex items-center gap-1 mt-0.5">
-                              {positive ? (
-                                <TrendingUp className="w-4 h-4 text-rose-500" />
-                              ) : (
-                                <TrendingDown className="w-4 h-4 text-sky-600" />
-                              )}
-                              {positive ? "+" : ""}
-                              {stats.rate_per_decade}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              {activeVar.unit}/dec
-                            </p>
+                            <p className="text-[10px] text-slate-400">{activeVar.unit}/dec</p>
                           </div>
-
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-slate-400">
-                              Mann-Kendall Z
-                            </p>
-                            <p className="text-base sm:text-lg font-mono font-extrabold text-slate-900 mt-0.5">
-                              {stats.z_score}σ
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              p = {stats.p_value.toFixed(4)}
-                            </p>
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Mann-Kendall Z</p>
+                            <p className="text-base sm:text-lg font-mono font-extrabold mt-0.5">{stats.z_score}σ</p>
+                            <p className="text-[10px] text-slate-400">p = {stats.p_value.toFixed(4)}</p>
                           </div>
-
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-slate-400">
-                              Baseline Mean
-                            </p>
-                            <p className="text-base sm:text-lg font-mono font-extrabold text-slate-900 mt-0.5">
-                              {stats.overall_mean}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              {activeVar.unit}
-                            </p>
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Baseline Mean</p>
+                            <p className="text-base sm:text-lg font-mono font-extrabold mt-0.5">{stats.overall_mean}</p>
+                            <p className="text-[10px] text-slate-400">{activeVar.unit}</p>
                           </div>
                         </div>
 
-                        {/* Time-Series Chart */}
                         <div className="h-[245px] w-full">
                           <ResponsiveContainer width="100%" height="100%">
-                            {seriesType === "anomaly" ? (
-                              <BarChart data={panel.series}>
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  stroke="#f1f5f9"
-                                  vertical={false}
-                                />
-                                <XAxis
-                                  dataKey="year"
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  minTickGap={30}
-                                />
-                                <YAxis
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    fontSize: "11px",
-                                  }}
-                                />
-                                <ReferenceLine y={0} stroke="#cbd5e1" />
-                                <Bar
-                                  dataKey="anomaly"
-                                  name={`Monthly Anomaly (${activeVar.unit})`}
-                                  radius={[2, 2, 0, 0]}
-                                >
-                                  {panel.series.map((entry, idx) => (
-                                    <Cell
-                                      key={idx}
-                                      fill={
-                                        entry.anomaly >= 0
-                                          ? "#f43f5e"
-                                          : "#0ea5e9"
-                                      }
-                                      fillOpacity={0.75}
-                                    />
-                                  ))}
-                                </Bar>
-                                {showRolling && (
-                                  <Line
-                                    type="monotone"
-                                    dataKey="rolling12m"
-                                    name="12-Month Moving Avg"
-                                    stroke="#0f172a"
-                                    strokeWidth={2}
-                                    dot={false}
-                                  />
-                                )}
-                              </BarChart>
-                            ) : (
-                              <LineChart data={panel.series}>
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  stroke="#f1f5f9"
-                                  vertical={false}
-                                />
-                                <XAxis
-                                  dataKey="year"
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  minTickGap={30}
-                                />
-                                <YAxis
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  width={45}
-                                  domain={["auto", "auto"]}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    fontSize: "11px",
-                                  }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="value"
-                                  name={`Observed (${activeVar.unit})`}
-                                  stroke={panel.accent}
-                                  strokeWidth={1.75}
-                                  dot={false}
-                                />
-                              </LineChart>
-                            )}
+                            <BarChart data={panel.series}>
+                              <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#f1f5f9"} vertical={false} />
+                              <XAxis dataKey="year" tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} minTickGap={30} />
+                              <YAxis tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} width={40} />
+                              <Tooltip contentStyle={{ borderRadius: "14px", backgroundColor: isDarkMode ? "#0f172a" : "#fff", border: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", fontSize: "11px" }} />
+                              <ReferenceLine y={0} stroke="#cbd5e1" />
+                              <Bar dataKey="anomaly" radius={[2, 2, 0, 0]}>
+                                {panel.series.map((entry, idx) => (
+                                  <Cell key={idx} fill={entry.anomaly >= 0 ? "#f43f5e" : "#0ea5e9"} fillOpacity={0.75} />
+                                ))}
+                              </Bar>
+                            </BarChart>
                           </ResponsiveContainer>
                         </div>
                       </div>
