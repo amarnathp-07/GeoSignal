@@ -414,7 +414,6 @@ export default function ClimateDashboard() {
       });
     }
 
-    // Load saved presets from localStorage
     const stored = localStorage.getItem("geosignal_saved_presets");
     if (stored) {
       try {
@@ -978,7 +977,7 @@ export default function ClimateDashboard() {
           </div>
         </section>
 
-        {/* Control Bar: Variable Pills + Time Baseline Sliders + Seasonality Filters */}
+        {/* Control Bar */}
         {!presentationMode && (
           <section className={`rounded-3xl border p-5 shadow-2xs space-y-5 transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"}`}>
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1362,13 +1361,14 @@ export default function ClimateDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Split / Overlay */}
             <div className={`flex rounded-xl p-1 text-xs font-bold ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`}>
               <button
                 type="button"
                 onClick={() => setChartMode("split")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${chartMode === "split" ? (isDarkMode ? "bg-slate-700 text-white shadow-2xs" : "bg-white text-slate-900 shadow-2xs") : "text-slate-400"}`}
               >
-                <Columns2 className="w-3.5 h-3.5" /> <span>Split</span>
+                <Columns2 className="w-3.5 h-3.5" /> <span>Split View</span>
               </button>
               <button
                 type="button"
@@ -1378,6 +1378,37 @@ export default function ClimateDashboard() {
                 <Layers className="w-3.5 h-3.5" /> <span>Overlay</span>
               </button>
             </div>
+
+            {/* Anomalies / Raw Cycles (Restored) */}
+            <div className={`flex rounded-xl p-1 text-xs font-bold ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`}>
+              <button
+                type="button"
+                onClick={() => setSeriesType("anomaly")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${seriesType === "anomaly" ? (isDarkMode ? "bg-slate-700 text-white shadow-2xs" : "bg-white text-slate-900 shadow-2xs") : "text-slate-400"}`}
+              >
+                Anomalies
+              </button>
+              <button
+                type="button"
+                onClick={() => setSeriesType("raw")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${seriesType === "raw" ? (isDarkMode ? "bg-slate-700 text-white shadow-2xs" : "bg-white text-slate-900 shadow-2xs") : "text-slate-400"}`}
+              >
+                Raw Cycles
+              </button>
+            </div>
+
+            {/* 12m Trend Toggle Button (Restored) */}
+            <button
+              type="button"
+              onClick={() => setShowRolling((prev) => !prev)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                showRolling
+                  ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/40"
+                  : isDarkMode ? "bg-slate-800 border-slate-700 text-slate-400" : "bg-white text-slate-600 border-slate-200"
+              }`}
+            >
+              12m Trend
+            </button>
 
             <button
               type="button"
@@ -1515,18 +1546,31 @@ export default function ClimateDashboard() {
 
                         <div className="h-[245px] w-full">
                           <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={panel.series}>
-                              <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#f1f5f9"} vertical={false} />
-                              <XAxis dataKey="year" tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} minTickGap={30} />
-                              <YAxis tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} width={40} />
-                              <Tooltip contentStyle={{ borderRadius: "14px", backgroundColor: isDarkMode ? "#0f172a" : "#fff", border: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", fontSize: "11px" }} />
-                              <ReferenceLine y={0} stroke="#cbd5e1" />
-                              <Bar dataKey="anomaly" radius={[2, 2, 0, 0]}>
-                                {panel.series.map((entry, idx) => (
-                                  <Cell key={idx} fill={entry.anomaly >= 0 ? "#f43f5e" : "#0ea5e9"} fillOpacity={0.75} />
-                                ))}
-                              </Bar>
-                            </BarChart>
+                            {seriesType === "anomaly" ? (
+                              <BarChart data={panel.series}>
+                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#f1f5f9"} vertical={false} />
+                                <XAxis dataKey="year" tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} minTickGap={30} />
+                                <YAxis tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} width={40} />
+                                <Tooltip contentStyle={{ borderRadius: "14px", backgroundColor: isDarkMode ? "#0f172a" : "#fff", border: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", fontSize: "11px" }} />
+                                <ReferenceLine y={0} stroke="#cbd5e1" />
+                                <Bar dataKey="anomaly" radius={[2, 2, 0, 0]}>
+                                  {panel.series.map((entry, idx) => (
+                                    <Cell key={idx} fill={entry.anomaly >= 0 ? "#f43f5e" : "#0ea5e9"} fillOpacity={0.75} />
+                                  ))}
+                                </Bar>
+                                {showRolling && (
+                                  <Line type="monotone" dataKey="rolling12m" name="12-Month Moving Avg" stroke={isDarkMode ? "#38bdf8" : "#0f172a"} strokeWidth={2} dot={false} />
+                                )}
+                              </BarChart>
+                            ) : (
+                              <LineChart data={panel.series}>
+                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#f1f5f9"} vertical={false} />
+                                <XAxis dataKey="year" tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} minTickGap={30} />
+                                <YAxis tick={{ fontSize: 10, fill: isDarkMode ? "#94a3b8" : "#64748b" }} width={45} domain={["auto", "auto"]} />
+                                <Tooltip contentStyle={{ borderRadius: "14px", backgroundColor: isDarkMode ? "#0f172a" : "#fff", border: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", fontSize: "11px" }} />
+                                <Line type="monotone" dataKey="value" name={`Observed (${activeVar.unit})`} stroke={panel.accent} strokeWidth={1.75} dot={false} />
+                              </LineChart>
+                            )}
                           </ResponsiveContainer>
                         </div>
                       </div>
