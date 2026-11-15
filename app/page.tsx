@@ -382,13 +382,9 @@ export default function ClimateDashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [resA, resB] = await Promise.all([
-          fetch(
-            `http://127.0.0.1:8000/api/analyze?lat=${latA}&lon=${lonA}&parameter=${param}`
-          ),
-          fetch(
-            `http://127.0.0.1:8000/api/analyze?lat=${latB}&lon=${lonB}&parameter=${param}`
-          ),
+       const [resA, resB] = await Promise.all([
+          fetch(`/api/analyze?lat=${latA}&lon=${lonA}&parameter=${param}`),
+          fetch(`/api/analyze?lat=${latB}&lon=${lonB}&parameter=${param}`),
         ]);
         if (!resA.ok || !resB.ok) {
           throw new Error(
