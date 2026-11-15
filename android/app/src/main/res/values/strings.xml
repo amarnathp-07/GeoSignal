@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GeoSignal</string>
+    <string name="title_activity_main">GeoSignal</string>
+    <string name="package_name">com.geosignal.app</string>
+    <string name="custom_url_scheme">com.geosignal.app</string>
+</resources>
