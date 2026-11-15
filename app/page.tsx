@@ -42,6 +42,7 @@ import {
   X,
   ShieldCheck,
   Printer,
+  Share2,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -372,6 +373,51 @@ export default function ClimateDashboard() {
 
   const activeVar = VARIABLES.find((v) => v.id === parameter) || VARIABLES[0];
 
+  // URL Deep-Link State Hydration on Mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pParam = params.get("param");
+    const latA = params.get("latA");
+    const lonA = params.get("lonA");
+    const nameA = params.get("nameA");
+    const latB = params.get("latB");
+    const lonB = params.get("lonB");
+    const nameB = params.get("nameB");
+
+    if (pParam && VARIABLES.some((v) => v.id === pParam)) {
+      setParameter(pParam);
+    }
+    if (latA && lonA) {
+      setRegionA({
+        name: nameA || "Custom Region A",
+        lat: parseFloat(latA),
+        lon: parseFloat(lonA),
+      });
+    }
+    if (latB && lonB) {
+      setRegionB({
+        name: nameB || "Custom Region B",
+        lat: parseFloat(latB),
+        lon: parseFloat(lonB),
+      });
+    }
+  }, []);
+
+  // Sync state changes to URL query parameters for deep-linking
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("param", parameter);
+    params.set("latA", regionA.lat.toString());
+    params.set("lonA", regionA.lon.toString());
+    params.set("nameA", regionA.name);
+    params.set("latB", regionB.lat.toString());
+    params.set("lonB", regionB.lon.toString());
+    params.set("nameB", regionB.name);
+
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, "", newUrl);
+  }, [parameter, regionA, regionB]);
+
   const runDualAnalysis = useCallback(
     async (
       latA: number,
@@ -692,6 +738,11 @@ SCIENTIFIC SYNTHESIS:
     URL.revokeObjectURL(url);
   };
 
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    alert("Shareable case study URL copied to clipboard!");
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans selection:bg-sky-100 selection:text-sky-900 pt-2">
       
@@ -741,6 +792,16 @@ SCIENTIFIC SYNTHESIS:
                 <Sparkles className="w-3.5 h-3.5" /> AI Assistant
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={copyShareLink}
+              title="Copy shareable deep-link URL"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5 text-slate-600" />
+              <span>Share Link</span>
+            </button>
 
             <button
               type="button"
@@ -1098,7 +1159,7 @@ SCIENTIFIC SYNTHESIS:
               </button>
             </div>
 
-            {/* Live USGS Seismic Tsunami Radar Tab */}
+            {/* Live USGS Seismic Tsunami Radar Tab with Automated Risk Classification Matrix */}
             <div className={`bg-white text-slate-900 rounded-3xl p-8 border border-slate-200/90 flex-col justify-between shadow-2xs ${activeTab === "tsunami" ? "flex" : "hidden"}`}>
               <div className="flex items-center justify-between mb-4">
                 <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-rose-600">
@@ -1109,9 +1170,31 @@ SCIENTIFIC SYNTHESIS:
                 </span>
               </div>
               <TsunamiGlobe3D />
-              <p className="text-xs text-slate-500 mt-2">
-                Integrating real-time global seismic feeds with directional sea-flow vectors to calculate tsunami hazard runups instantly.
-              </p>
+              
+              {/* Automated Seismic Hazard & Risk Classification Matrix */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-600 text-white uppercase">
+                    Severe Warning
+                  </span>
+                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude $\ge$ 7.0 / Subduction</p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">Triggers immediate hydrodynamic sea-flow runup simulations and evacuation alerts.</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950 uppercase">
+                    Moderate Advisory
+                  </span>
+                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude 5.5 – 6.9</p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">Monitors coastal displacement velocity and minor tidal anomaly anomalies.</p>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white uppercase">
+                    Low Risk / Background
+                  </span>
+                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude &lt; 5.5</p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">Normal tectonic activity recorded across standard global seismic stations.</p>
+                </div>
+              </div>
             </div>
 
             {/* AI Assistant Tab */}
