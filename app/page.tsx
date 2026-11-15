@@ -593,7 +593,6 @@ SCIENTIFIC SYNTHESIS:
     URL.revokeObjectURL(url);
   };
 
-  // ONE-CLICK EXECUTIVE PDF BRIEF EXPORT (Opens professional print view for PDF saving)
   const exportPDFReport = () => {
     if (!dataA || !dataB) return;
     const printWindow = window.open("", "_blank");
@@ -616,7 +615,7 @@ SCIENTIFIC SYNTHESIS:
             h3 { font-size: 14px; text-transform: uppercase; color: #334155; margin-top: 0; }
             .metric { font-size: 18px; font-weight: bold; color: #0f172a; margin: 5px 0; font-family: monospace; }
             .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; background: #e0f2fe; color: #0369a1; }
-            .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; paddingTop: 15px; }
+            .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
           </style>
         </head>
         <body>
