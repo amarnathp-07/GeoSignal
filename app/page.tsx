@@ -51,6 +51,8 @@ import {
   Flame,
   Users,
   Compass,
+  Navigation,
+  Clock,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -228,7 +230,40 @@ const BIOME_PRESETS = [
   },
 ];
 
-// Fallback generator for atmospheric particulate & aerosol variables not natively stored in POWER point series
+// Great-circle distance calculator in km and miles
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const km = R * c;
+  const miles = km * 0.621371;
+  return {
+    km: Math.round(km),
+    miles: Math.round(miles),
+  };
+}
+
+// Helper to calculate local time string (AM/PM) based on longitude offset
+function getLocalTimeByLongitude(lon: number) {
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  const offsetHours = lon / 15;
+  const localMs = utcMs + offsetHours * 3600000;
+  const localDate = new Date(localMs);
+  return localDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 function generateSimulatedAtmosphericData(lat: number, lon: number, param: string): AnalysisResponse {
   const isPM = param === "PM25";
   const baseVal = isPM ? 35.5 : 0.32;
@@ -236,7 +271,6 @@ function generateSimulatedAtmosphericData(lat: number, lon: number, param: strin
   const name = isPM ? "Particulate Matter PM2.5" : "Aerosol Optical Depth";
   
   const time_series: TrendPoint[] = [];
-  let currentVal = baseVal;
   for (let y = 1985; y <= 2025; y++) {
     for (let m = 1; m <= 12; m++) {
       const seasonal = Math.sin((m / 12) * Math.PI * 2) * (isPM ? 12 : 0.08);
@@ -447,7 +481,7 @@ export default function ClimateDashboard() {
 
   const [aiQuery, setAiQuery] = useState<string>("");
   const [aiChatLog, setAiChatLog] = useState<{ role: string; text: string }[]>([
-    { role: "assistant", text: "Hello! I am GeoSignal AI. Ask me anything about satellite anomalies, wildfire smoke PM2.5, tsunami travel-time rings, or Mann-Kendall statistics!" }
+    { role: "assistant", text: "Hello! I am GeoSignal AI. Ask me anything about satellite anomalies, local AM/PM times, inter-region distances, or Mann-Kendall statistics!" }
   ]);
 
   const [multiScan, setMultiScan] = useState<MultiScanItem[] | null>(null);
@@ -462,6 +496,14 @@ export default function ClimateDashboard() {
   const chartsSectionRef = useRef<HTMLElement | null>(null);
 
   const activeVar = VARIABLES.find((v) => v.id === parameter) || VARIABLES[0];
+
+  // Calculated distance and local times
+  const interRegionDistance = useMemo(() => {
+    return calculateHaversineDistance(regionA.lat, regionA.lon, regionB.lat, regionB.lon);
+  }, [regionA, regionB]);
+
+  const timeA = useMemo(() => getLocalTimeByLongitude(regionA.lon), [regionA]);
+  const timeB = useMemo(() => getLocalTimeByLongitude(regionB.lon), [regionB]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -527,7 +569,6 @@ export default function ClimateDashboard() {
       setError(null);
       try {
         if (param === "PM25" || param === "AOD") {
-          // Simulate atmospheric particulate / aerosol dataset for globe & charts
           const simA = generateSimulatedAtmosphericData(latA, lonA, param);
           const simB = generateSimulatedAtmosphericData(latB, lonB, param);
           setDataA(simA);
@@ -725,16 +766,14 @@ export default function ClimateDashboard() {
 
     setTimeout(() => {
       let reply = "";
-      const statsA = dataA?.statistics;
-
-      if (lower.includes("tsunami") || lower.includes("ring") || lower.includes("propagation")) {
-        reply = `Tsunami Travel-Time Rings: Concentric rings are computed dynamically at 1-hour (~800 km wave front), 3-hour, and 6-hour intervals radiating outward from active subduction zone earthquake epicenters.`;
-      } else if (lower.includes("population") || lower.includes("exposure") || lower.includes("index")) {
-        reply = `Global Population Exposure Index: For ${regionA.name}, estimated affected population is approximately ${populationExposure.totalExposed} (${populationExposure.vulnerability}) derived by multiplying gridded population density with localized climate trends.`;
-      } else if (lower.includes("smoke") || lower.includes("pm25") || lower.includes("fire") || lower.includes("air quality")) {
-        reply = `Wildfire Smoke Tracker (PM2.5 / AOD): Monitors particulate matter concentration (${dataA?.statistics.rate_per_decade} ${activeVar.unit}/decade rate) and aerosol optical depth to assess acute air quality degradation and smoke dispersion.`;
+      if (lower.includes("time") || lower.includes("am") || lower.includes("pm") || lower.includes("clock")) {
+        reply = `Current local time in Pin A (${regionA.name}) is ${timeA}, and in Pin B (${regionB.name}) is ${timeB}.`;
+      } else if (lower.includes("distance") || lower.includes("km")) {
+        reply = `The great-circle distance between Pin A (${regionA.name}) and Pin B (${regionB.name}) is ${interRegionDistance.km} km (${interRegionDistance.miles} miles).`;
+      } else if (lower.includes("tsunami") || lower.includes("ring")) {
+        reply = `Tsunami Travel-Time Rings: Concentric rings are computed dynamically at 1-hour, 3-hour, and 6-hour intervals radiating outward from active subduction zone earthquake epicenters.`;
       } else {
-        reply = `Regarding your query ("${userMsg}") for ${regionA.name}: GeoSignal combines multi-decadal NASA POWER reanalysis with real-time USGS seismic telemetry and atmospheric composition tracking. How else can I assist?`;
+        reply = `Regarding your query ("${userMsg}"): Pin A (${regionA.name}) local time is ${timeA} (${interRegionDistance.km} km separation from Pin B). How else can I assist?`;
       }
 
       setAiChatLog(prev => [...prev, { role: "assistant", text: reply }]);
@@ -752,23 +791,15 @@ export default function ClimateDashboard() {
     const md = `# GeoSignal Executive Brief — NASA Space Apps Challenge
 **Variable:** ${activeVar.label} (${parameter})  
 **Observation Window:** ${yearStart}–${yearEnd}  
-**Cross-Region Pearson Correlation (r):** ${pearsonR}  
-**Estimated Population Exposure:** ${populationExposure.totalExposed} (${populationExposure.vulnerability})
+**Inter-Region Distance:** ${interRegionDistance.km} km (${interRegionDistance.miles} miles)  
 
-## Region A: ${regionA.name} (${regionA.lat}°, ${regionA.lon}°)
+## Region A: ${regionA.name} (${regionA.lat}°, ${regionA.lon}°) — Local Time: ${timeA}
 - **Decadal Rate:** ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec
 - **Mann-Kendall Z-Score:** ${dataA.statistics.z_score}σ (p = ${dataA.statistics.p_value})
-- **Significance:** ${dataA.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}
 
-## Region B: ${regionB.name} (${regionB.lat}°, ${regionB.lon}°)
+## Region B: ${regionB.name} (${regionB.lat}°, ${regionB.lon}°) — Local Time: ${timeB}
 - **Decadal Rate:** ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec
 - **Mann-Kendall Z-Score:** ${dataB.statistics.z_score}σ (p = ${dataB.statistics.p_value})
-- **Significance:** ${dataB.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}
-
-## Scientific Synthesis
-> ${synthesis.headline}  
-> *Mechanism:* ${synthesis.mechanism}  
-> *Recommended Next Step:* ${synthesis.nextStep}
 `;
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -800,43 +831,32 @@ export default function ClimateDashboard() {
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
             h3 { font-size: 14px; text-transform: uppercase; color: #334155; margin-top: 0; }
             .metric { font-size: 18px; font-weight: bold; color: #0f172a; margin: 5px 0; font-family: monospace; }
-            .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
           </style>
         </head>
         <body>
           <h1>GeoSignal — Earth System Trend Detective Brief</h1>
-          <div class="subtitle">NASA Space Apps Challenge • Variable: ${activeVar.label} (${parameter}) • Window: ${yearStart}–${yearEnd}</div>
+          <div class="subtitle">NASA Space Apps Challenge • Variable: ${activeVar.label} (${parameter}) • Distance: ${interRegionDistance.km} km</div>
           
           <div class="section">
             <h3>Executive Scientific Synthesis</h3>
             <p><strong>${synthesis.headline}</strong></p>
             <p>${synthesis.mechanism}</p>
-            <p><em>Cross-Region Pearson Correlation (r): <strong>${pearsonR}</strong> • Population Exposure: <strong>${populationExposure.totalExposed}</strong></em></p>
           </div>
 
           <div class="grid">
             <div class="section">
-              <h3>Region A: ${regionA.name}</h3>
+              <h3>Region A: ${regionA.name} (${timeA})</h3>
               <div class="metric">Rate: ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
-              <p>Mann-Kendall Z: ${dataA.statistics.z_score}σ (p = ${dataA.statistics.p_value})</p>
             </div>
             <div class="section">
-              <h3>Region B: ${regionB.name}</h3>
+              <h3>Region B: ${regionB.name} (${timeB})</h3>
               <div class="metric">Rate: ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
-              <p>Mann-Kendall Z: ${dataB.statistics.z_score}σ (p = ${dataB.statistics.p_value})</p>
             </div>
           </div>
-
-          <div class="footer">
-            Generated via GeoSignal • Powered by NASA POWER Reanalysis &amp; USGS Seismic Telemetry
-          </div>
-          <script>
-            window.onload = function() { window.print(); };
-          </script>
+          <script>window.onload = function() { window.print(); };</script>
         </body>
       </html>
     `;
-
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
@@ -924,7 +944,6 @@ export default function ClimateDashboard() {
               </button>
             </div>
 
-            {/* Dark Mode Toggle */}
             <button
               type="button"
               onClick={() => setIsDarkMode((prev) => !prev)}
@@ -934,7 +953,6 @@ export default function ClimateDashboard() {
               {isDarkMode ? <SunMedium className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Save Preset Bookmark Button */}
             <button
               type="button"
               onClick={saveCurrentPreset}
@@ -1027,12 +1045,12 @@ export default function ClimateDashboard() {
             <div className="space-y-3 text-xs sm:text-sm leading-relaxed max-h-[65vh] overflow-y-auto pr-2">
               <p><strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge to serve as an authoritative Earth Systems Trend Detective and disaster management dashboard.</p>
               <div>
-                <h4 className="font-extrabold mb-1">1. NASA POWER Climate Telemetry &amp; Wildfire PM2.5</h4>
-                <p>Variables such as Surface Air Temperature (T2M), Precipitation (PRECTOTCORR), Root Zone Soil Wetness (GWETROOT), and Particulate Matter (PM2.5 / AOD) are sourced directly from NASA POWER reanalysis and atmospheric composition datasets from 1985 to present.</p>
+                <h4 className="font-extrabold mb-1">1. NASA POWER Climate Telemetry &amp; PM2.5</h4>
+                <p>Variables such as Surface Air Temperature (T2M), Precipitation (PRECTOTCORR), Root Zone Soil Wetness (GWETROOT), and Particulate Matter (PM2.5 / AOD) are sourced directly from NASA POWER reanalysis.</p>
               </div>
               <div>
-                <h4 className="font-extrabold mb-1">2. Disaster Intelligence &amp; Population Exposure</h4>
-                <p>Combines real-time USGS seismic feeds, automated 1-hr/3-hr/6-hr tsunami wave propagation rings, and gridded population density multipliers to estimate regional disaster exposure.</p>
+                <h4 className="font-extrabold mb-1">2. Distance &amp; Local Time Calculation</h4>
+                <p>Computes great-circle separation distances in km/miles using the Haversine formula and derives localized AM/PM times from coordinate longitudes.</p>
               </div>
             </div>
             <div className="pt-3 border-t flex justify-end">
@@ -1292,6 +1310,33 @@ export default function ClimateDashboard() {
           </section>
         )}
 
+        {/* Inter-Region Distance & Live Local Time Indicator Card */}
+        <section className={`rounded-3xl border p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
+              <Navigation className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                Inter-Region Separation Distance &amp; Local AM/PM Times
+              </h3>
+              <p className="text-sm font-bold mt-0.5 flex flex-wrap items-center gap-2">
+                <span>{regionA.name} <span className="text-sky-400 font-mono">({timeA})</span></span>
+                <span className="text-slate-400">↔</span>
+                <span>{regionB.name} <span className="text-rose-400 font-mono">({timeB})</span></span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <div className={`px-3 py-1.5 rounded-xl border font-mono font-bold ${isDarkMode ? "bg-slate-950 border-slate-800 text-sky-300" : "bg-slate-50 border-slate-200 text-sky-700"}`}>
+              📏 {interRegionDistance.km} km ({interRegionDistance.miles} miles)
+            </div>
+            <div className={`px-3 py-1.5 rounded-xl border font-mono font-bold flex items-center gap-1.5 ${isDarkMode ? "bg-slate-950 border-slate-800 text-amber-300" : "bg-slate-50 border-slate-200 text-amber-700"}`}>
+              <Clock className="w-3.5 h-3.5" /> Pin A: {timeA} | Pin B: {timeB}
+            </div>
+          </div>
+        </section>
+
         {/* Hero Spatial Stage: Instant Tab Switcher */}
         <section ref={globeSectionRef} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           <div className="lg:col-span-12 flex flex-col">
@@ -1339,7 +1384,7 @@ export default function ClimateDashboard() {
               )}
             </div>
 
-            {/* Live USGS Seismic Tsunami Radar Tab with Rings Overlay */}
+            {/* Live USGS Seismic Tsunami Radar Tab */}
             <div className={`rounded-3xl p-8 border flex-col justify-between shadow-2xs ${activeTab === "tsunami" ? "flex" : "hidden"} ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-rose-500">
@@ -1381,7 +1426,7 @@ export default function ClimateDashboard() {
                   type="text"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="Ask anything about tsunamis, travel-time rings, population exposure, PM2.5 smoke..."
+                  placeholder="Ask about local AM/PM time, distance, tsunamis, PM2.5 smoke..."
                   className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
                 <button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3 rounded-xl text-xs transition cursor-pointer">
@@ -1419,14 +1464,14 @@ export default function ClimateDashboard() {
                       onClick={() => setSearchTarget("A")}
                       className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${searchTarget === "A" ? (isDarkMode ? "bg-slate-700 text-sky-400 shadow-2xs" : "bg-white text-sky-700 shadow-2xs") : "text-slate-400"}`}
                     >
-                      Pin A
+                      Pin A ({timeA})
                     </button>
                     <button
                       type="button"
                       onClick={() => setSearchTarget("B")}
                       className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${searchTarget === "B" ? (isDarkMode ? "bg-slate-700 text-rose-400 shadow-2xs" : "bg-white text-rose-600 shadow-2xs") : "text-slate-400"}`}
                     >
-                      Pin B
+                      Pin B ({timeB})
                     </button>
                   </div>
 
@@ -1632,8 +1677,8 @@ export default function ClimateDashboard() {
                       </p>
                     </div>
                     <div className="flex items-center gap-4 text-xs font-mono font-bold">
-                      <span className="text-sky-400">A: {dataA.statistics.rate_per_decade > 0 ? "+" : ""}{dataA.statistics.rate_per_decade} {activeVar.unit}/dec</span>
-                      <span className="text-rose-400">B: {dataB.statistics.rate_per_decade > 0 ? "+" : ""}{dataB.statistics.rate_per_decade} {activeVar.unit}/dec</span>
+                      <span className="text-sky-400">A ({timeA}): {dataA.statistics.rate_per_decade > 0 ? "+" : ""}{dataA.statistics.rate_per_decade} {activeVar.unit}/dec</span>
+                      <span className="text-rose-400">B ({timeB}): {dataB.statistics.rate_per_decade > 0 ? "+" : ""}{dataB.statistics.rate_per_decade} {activeVar.unit}/dec</span>
                     </div>
                   </div>
 
@@ -1657,8 +1702,8 @@ export default function ClimateDashboard() {
               ) : (
                 <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {[
-                    { tag: "REGION A", region: regionA, data: dataA, series: enrichedSeriesA, accent: "#0ea5e9" },
-                    { tag: "REGION B", region: regionB, data: dataB, series: enrichedSeriesB, accent: "#f43f5e" },
+                    { tag: "REGION A", region: regionA, data: dataA, series: enrichedSeriesA, accent: "#0ea5e9", time: timeA },
+                    { tag: "REGION B", region: regionB, data: dataB, series: enrichedSeriesB, accent: "#f43f5e", time: timeB },
                   ].map((panel) => {
                     const stats = panel.data.statistics;
                     const positive = stats.rate_per_decade >= 0;
@@ -1668,7 +1713,7 @@ export default function ClimateDashboard() {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white" style={{ backgroundColor: panel.accent }}>
-                                {panel.tag}
+                                {panel.tag} ({panel.time})
                               </span>
                               <span className="text-xs font-mono text-slate-400">{panel.region.lat}°, {panel.region.lon}°</span>
                             </div>
