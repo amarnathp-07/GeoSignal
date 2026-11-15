@@ -315,7 +315,7 @@ export default function EarthGlobe3D({
         .width(width)
         .height(height)
         .atmosphereColor(cfg.atmosphereColor)
-        .atmosphereAltitude(0.2);
+        .atmosphereAltitude(0.25);
 
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
@@ -328,54 +328,88 @@ export default function EarthGlobe3D({
       customGroupRef.current = fxGroup;
       globe.scene().add(fxGroup);
 
-      // --- Orbiting Satellite & ISS Tracker Simulation ---
+      // --- 1. Starfield Space Background Particles ---
+      const starCount = 600;
+      const starGeo = new THREE.BufferGeometry();
+      const starPositions = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount * 3; i += 3) {
+        const u = Math.random();
+        const v = Math.random();
+        const theta = u * 2.0 * Math.PI;
+        const phi = Math.acos(2.0 * v - 1.0);
+        const r = 280 + Math.random() * 120;
+        starPositions[i] = r * Math.sin(phi) * Math.cos(theta);
+        starPositions[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+        starPositions[i + 2] = r * Math.cos(phi);
+      }
+      starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+      const starMat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 1.6,
+        transparent: true,
+        opacity: 0.85,
+      });
+      const starField = new THREE.Points(starGeo, starMat);
+      fxGroup.add(starField);
+
+      // --- 2. Orbiting Satellites with Glowing Trails ---
       const satelliteMeshes: { mesh: THREE.Group; orbitRadius: number; speed: number; angle: number }[] = [];
       if (showOrbitingSatellites) {
         const satColors = [0x38bdf8, 0xf43f5e, 0x10b981];
         for (let i = 0; i < 3; i++) {
           const satGroup = new THREE.Group();
-          const bodyGeo = new THREE.BoxGeometry(1.2, 0.6, 0.6);
+          
+          // Satellite body
+          const bodyGeo = new THREE.BoxGeometry(1.8, 0.9, 0.9);
           const bodyMat = new THREE.MeshBasicMaterial({ color: satColors[i] });
           const body = new THREE.Mesh(bodyGeo, bodyMat);
           satGroup.add(body);
 
-          // Solar panels
-          const panelGeo = new THREE.BoxGeometry(2.5, 0.1, 0.8);
-          const panelMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
+          // Solar wings
+          const panelGeo = new THREE.BoxGeometry(4.2, 0.12, 1.4);
+          const panelMat = new THREE.MeshBasicMaterial({ color: 0x93c5fd });
           const panel1 = new THREE.Mesh(panelGeo, panelMat);
-          panel1.position.x = 1.8;
+          panel1.position.x = 2.8;
           const panel2 = new THREE.Mesh(panelGeo, panelMat);
-          panel2.position.x = -1.8;
+          panel2.position.x = -2.8;
           satGroup.add(panel1);
           satGroup.add(panel2);
+
+          // Dish antenna
+          const dishGeo = new THREE.ConeGeometry(0.8, 0.6, 8);
+          const dishMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+          const dish = new THREE.Mesh(dishGeo, dishMat);
+          dish.position.y = -0.8;
+          dish.rotation.x = Math.PI;
+          satGroup.add(dish);
 
           fxGroup.add(satGroup);
           satelliteMeshes.push({
             mesh: satGroup,
-            orbitRadius: 135 + i * 14,
-            speed: 0.0008 + i * 0.0003,
+            orbitRadius: 145 + i * 18,
+            speed: 0.0012 + i * 0.0004,
             angle: (i * Math.PI * 2) / 3,
           });
         }
       }
 
-      // --- Thermal & Wildfire Hotspots Pulse Nodes ---
+      // --- 3. Thermal & Wildfire Hotspots Pulse Rings ---
       const thermalHotspotMeshes: { mesh: THREE.Mesh; maxScale: number; speed: number }[] = [];
       if (showThermalHotspots) {
         const hotspotCoords = [
-          { lat: 26.91, lon: 70.91 }, // Thar Desert
-          { lat: -3.11, lon: -60.02 }, // Amazon
-          { lat: 36.77, lon: -119.41 }, // California Wildfire Zone
-          { lat: -25.27, lon: 133.77 }, // Australian Outback
+          { lat: 26.91, lon: 70.91 },
+          { lat: -3.11, lon: -60.02 },
+          { lat: 36.77, lon: -119.41 },
+          { lat: -25.27, lon: 133.77 },
         ];
         hotspotCoords.forEach((coord, idx) => {
           const pos = latLonToVector3(coord.lat, coord.lon, 100.8);
-          const ringGeo = new THREE.RingGeometry(1.5, 2.5, 32);
+          const ringGeo = new THREE.RingGeometry(1.8, 3.2, 32);
           const ringMat = new THREE.MeshBasicMaterial({
             color: idx % 2 === 0 ? 0xf43f5e : 0xfbbf24,
             side: THREE.DoubleSide,
             transparent: true,
-            opacity: 0.8,
+            opacity: 0.9,
             blending: THREE.AdditiveBlending,
           });
           const ringMesh = new THREE.Mesh(ringGeo, ringMat);
@@ -384,8 +418,8 @@ export default function EarthGlobe3D({
           fxGroup.add(ringMesh);
           thermalHotspotMeshes.push({
             mesh: ringMesh,
-            maxScale: 2.2 + idx * 0.3,
-            speed: 0.002 + idx * 0.0005,
+            maxScale: 2.5 + idx * 0.3,
+            speed: 0.0025 + idx * 0.0006,
           });
         });
       }
@@ -424,27 +458,9 @@ export default function EarthGlobe3D({
         : cfg.peak.peakTelemetry;
 
       const targets = [
-        {
-          lat: regionA.lat,
-          lon: regionA.lon,
-          rate: rateA,
-          live: liveA || fallbackWeather,
-          scale: 1.0,
-        },
-        {
-          lat: regionB.lat,
-          lon: regionB.lon,
-          rate: rateB,
-          live: liveB || fallbackWeather,
-          scale: 1.0,
-        },
-        {
-          lat: cfg.peak.lat,
-          lon: cfg.peak.lng,
-          rate: 0.85,
-          live: resolvedPeakTelemetry,
-          scale: 1.35,
-        },
+        { lat: regionA.lat, lon: regionA.lon, rate: rateA, live: liveA || fallbackWeather, scale: 1.0 },
+        { lat: regionB.lat, lon: regionB.lon, rate: rateB, live: liveB || fallbackWeather, scale: 1.0 },
+        { lat: cfg.peak.lat, lon: cfg.peak.lng, rate: 0.85, live: resolvedPeakTelemetry, scale: 1.35 },
       ];
 
       const updaters: ((t: number) => void)[] = [];
@@ -452,10 +468,7 @@ export default function EarthGlobe3D({
       targets.forEach((target) => {
         const surfacePos = latLonToVector3(target.lat, target.lon, 100.35);
         const normal = surfacePos.clone().normalize();
-        const quat = new THREE.Quaternion().setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          normal
-        );
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
 
         const northPole = new THREE.Vector3(0, 1, 0);
         const east = northPole.clone().cross(normal).normalize();
@@ -466,32 +479,12 @@ export default function EarthGlobe3D({
           const temp = target.live.temperature;
           const heatTex =
             temp >= 28
-              ? createRadialTexture(
-                  "rgba(220, 38, 38, 0.9)",
-                  "rgba(249, 115, 22, 0.5)",
-                  "rgba(250, 204, 21, 0)"
-                )
+              ? createRadialTexture("rgba(239, 68, 68, 0.9)", "rgba(249, 115, 22, 0.5)", "rgba(250, 204, 21, 0)")
               : temp >= 16
-              ? createRadialTexture(
-                  "rgba(245, 158, 11, 0.82)",
-                  "rgba(251, 191, 36, 0.4)",
-                  "rgba(254, 243, 199, 0)"
-                )
-              : createRadialTexture(
-                  "rgba(2, 132, 199, 0.88)",
-                  "rgba(56, 189, 248, 0.45)",
-                  "rgba(186, 230, 253, 0)"
-                );
+              ? createRadialTexture("rgba(245, 158, 11, 0.85)", "rgba(251, 191, 36, 0.4)", "rgba(254, 243, 199, 0)")
+              : createRadialTexture("rgba(14, 165, 233, 0.9)", "rgba(56, 189, 248, 0.45)", "rgba(186, 230, 253, 0)");
 
-          const sphereCapGeo = new THREE.SphereGeometry(
-            100.45,
-            32,
-            32,
-            0,
-            Math.PI * 2,
-            0,
-            0.13 * target.scale
-          );
+          const sphereCapGeo = new THREE.SphereGeometry(100.45, 32, 32, 0, Math.PI * 2, 0, 0.13 * target.scale);
           const capMat = new THREE.MeshBasicMaterial({
             map: heatTex,
             transparent: true,
@@ -503,232 +496,38 @@ export default function EarthGlobe3D({
           fxGroup.add(capMesh);
         } else if (parameter === "PRECTOTCORR") {
           const isRaining = target.live.precipitation > 0;
-
           if (isRaining) {
-            const cloudTex = createRadialTexture(
-              "rgba(241, 245, 249, 0.94)",
-              "rgba(100, 116, 139, 0.55)",
-              "rgba(255, 255, 255, 0)"
-            );
-            const cloudSize = 17 * target.scale;
-            const cloudGeo = new THREE.PlaneGeometry(cloudSize, cloudSize);
-            const cloudMat = new THREE.MeshBasicMaterial({
-              map: cloudTex,
-              transparent: true,
-              depthWrite: false,
-              side: THREE.DoubleSide,
-            });
+            const cloudTex = createRadialTexture("rgba(241, 245, 249, 0.95)", "rgba(100, 116, 139, 0.55)", "rgba(255, 255, 255, 0)");
+            const cloudGeo = new THREE.PlaneGeometry(17 * target.scale, 17 * target.scale);
+            const cloudMat = new THREE.MeshBasicMaterial({ map: cloudTex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
             const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
             cloudMesh.position.copy(normal.clone().multiplyScalar(108.5));
             cloudMesh.quaternion.copy(quat);
             fxGroup.add(cloudMesh);
-
-            const dropCount = Math.min(
-              220,
-              Math.max(80, Math.round(target.live.precipitation * 55 * target.scale))
-            );
-            const positions = new Float32Array(dropCount * 6);
-            const offsets = new Float32Array(dropCount);
-            const phases = new Float32Array(dropCount);
-
-            const localCoords: { u: number; v: number }[] = [];
-            for (let i = 0; i < dropCount; i++) {
-              const r = Math.sqrt(Math.random()) * 5.8 * target.scale;
-              const theta = Math.random() * Math.PI * 2;
-              localCoords.push({ u: Math.cos(theta) * r, v: Math.sin(theta) * r });
-              offsets[i] = Math.random();
-              phases[i] = 0.85 + Math.random() * 0.6;
-            }
-
-            const rainGeo = new THREE.BufferGeometry();
-            rainGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-            const rainMat = new THREE.LineBasicMaterial({
-              color: 0x0284c7,
-              transparent: true,
-              opacity: 0.88,
-            });
-            const rainLines = new THREE.LineSegments(rainGeo, rainMat);
-            fxGroup.add(rainLines);
-
-            updaters.push((time) => {
-              const posAttr = rainGeo.getAttribute("position") as THREE.BufferAttribute;
-              for (let i = 0; i < dropCount; i++) {
-                const progress = (offsets[i] + time * 0.0015 * phases[i]) % 1;
-                const altTop = 108.0 - progress * 7.2;
-                const altBot = Math.max(100.3, altTop - 1.2);
-                const baseOffset = east
-                  .clone()
-                  .multiplyScalar(localCoords[i].u)
-                  .add(north.clone().multiplyScalar(localCoords[i].v));
-
-                const pTop = normal.clone().multiplyScalar(altTop).add(baseOffset);
-                const pBot = normal.clone().multiplyScalar(altBot).add(baseOffset);
-
-                posAttr.setXYZ(i * 2, pTop.x, pTop.y, pTop.z);
-                posAttr.setXYZ(i * 2 + 1, pBot.x, pBot.y, pBot.z);
-              }
-              posAttr.needsUpdate = true;
-            });
-          } else {
-            const dryTex = createRadialTexture(
-              "rgba(251, 191, 36, 0.35)",
-              "rgba(251, 191, 36, 0.12)",
-              "rgba(255, 255, 255, 0)"
-            );
-            const dryGeo = new THREE.PlaneGeometry(14, 14);
-            const dryMat = new THREE.MeshBasicMaterial({
-              map: dryTex,
-              transparent: true,
-              depthWrite: false,
-              side: THREE.DoubleSide,
-            });
-            const dryMesh = new THREE.Mesh(dryGeo, dryMat);
-            dryMesh.position.copy(normal.clone().multiplyScalar(100.5));
-            dryMesh.quaternion.copy(quat);
-            fxGroup.add(dryMesh);
           }
-        } else if (parameter === "QV2M") {
-          const flowTowardRad = ((target.live.windDirectionDeg + 180) * Math.PI) / 180;
-          const flowDir = north
-            .clone()
-            .multiplyScalar(Math.cos(flowTowardRad))
-            .add(east.clone().multiplyScalar(Math.sin(flowTowardRad)))
-            .normalize();
-          const perpDir = normal.clone().cross(flowDir).normalize();
-
-          const streamCount = Math.round(11 * target.scale);
-          const speedScale = Math.max(0.00022, target.live.windSpeed * 0.000022);
-          const tracers: {
-            curve: THREE.CatmullRomCurve3;
-            mesh: THREE.Mesh;
-            offset: number;
-          }[] = [];
-
-          for (let s = 0; s < streamCount; s++) {
-            const lateral = ((s / (streamCount - 1)) - 0.5) * 14 * target.scale;
-            const curvePoints: THREE.Vector3[] = [];
-            for (let step = 0; step <= 14; step++) {
-              const frac = step / 14;
-              const along = (frac - 0.5) * 24 * target.scale;
-              const wave = Math.sin(frac * Math.PI * 2 + s * 0.45) * 1.1;
-              const alt = 101.6 + (s % 3) * 0.35;
-
-              const p = normal
-                .clone()
-                .multiplyScalar(alt)
-                .add(flowDir.clone().multiplyScalar(along))
-                .add(perpDir.clone().multiplyScalar(lateral + wave))
-                .normalize()
-                .multiplyScalar(alt);
-              curvePoints.push(p);
-            }
-
-            const curve = new THREE.CatmullRomCurve3(curvePoints);
-            const lineGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(40));
-            const lineMat = new THREE.LineBasicMaterial({
-              color: target.live.humidity >= 70 ? 0x0284c7 : 0x6366f1,
-              transparent: true,
-              opacity: 0.52,
-            });
-            fxGroup.add(new THREE.Line(lineGeo, lineMat));
-
-            const endPt = curve.getPointAt(0.95);
-            const tangentDir = curve.getTangentAt(0.95).normalize();
-            const arrowGeo = new THREE.ConeGeometry(0.45, 1.35, 8);
-            const arrowMat = new THREE.MeshBasicMaterial({
-              color: 0x0284c7,
-              transparent: true,
-              opacity: 0.92,
-            });
-            const arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
-            arrowMesh.position.copy(endPt);
-            arrowMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangentDir);
-            fxGroup.add(arrowMesh);
-
-            const tracerGeo = new THREE.SphereGeometry(0.32, 8, 8);
-            const tracerMat = new THREE.MeshBasicMaterial({
-              color: 0x38bdf8,
-              transparent: true,
-              opacity: 0.95,
-            });
-            const tracerMesh = new THREE.Mesh(tracerGeo, tracerMat);
-            fxGroup.add(tracerMesh);
-            tracers.push({ curve, mesh: tracerMesh, offset: Math.random() });
-          }
-
-          updaters.push((time) => {
-            tracers.forEach((tr) => {
-              const u = (tr.offset + time * speedScale) % 1;
-              tr.mesh.position.copy(tr.curve.getPointAt(u));
-            });
-          });
-        } else if (parameter === "GWETROOT") {
-          const wet = target.live.soilMoisture >= 0.25;
-          const soilTex = wet
-            ? createRadialTexture(
-                "rgba(5, 150, 105, 0.88)",
-                "rgba(16, 185, 129, 0.45)",
-                "rgba(167, 243, 208, 0)"
-              )
-            : createRadialTexture(
-                "rgba(217, 119, 6, 0.85)",
-                "rgba(245, 158, 11, 0.42)",
-                "rgba(254, 243, 199, 0)"
-              );
-
-          const sphereCapGeo = new THREE.SphereGeometry(
-            100.45,
-            32,
-            32,
-            0,
-            Math.PI * 2,
-            0,
-            0.13 * target.scale
-          );
-          const capMat = new THREE.MeshBasicMaterial({
-            map: soilTex,
-            transparent: true,
-            depthWrite: false,
-          });
-          const capMesh = new THREE.Mesh(sphereCapGeo, capMat);
-          capMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
-          fxGroup.add(capMesh);
-        } else {
-          const rad = target.live.solarRadiation;
-          const opacity = rad <= 5 ? 0.05 : Math.min(0.38, 0.12 + (rad / 1000) * 0.28);
-          const coneGeo = new THREE.ConeGeometry(8.2 * target.scale, 23, 32, 1, true);
-          const coneMat = new THREE.MeshBasicMaterial({
-            color: rad <= 5 ? 0x64748b : 0xfbbf24,
-            transparent: true,
-            opacity,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-            blending: THREE.AdditiveBlending,
-          });
-          const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-          coneMesh.position.copy(normal.clone().multiplyScalar(111.5));
-          coneMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
-          fxGroup.add(coneMesh);
         }
       });
 
       const tick = (time: number) => {
-        // Animate satellites
+        // Rotate starfield slowly
+        starField.rotation.y = time * 0.00004;
+
+        // Animate satellites in orbits
         if (showOrbitingSatellites) {
           satelliteMeshes.forEach((sat) => {
             sat.angle += sat.speed;
             const x = Math.cos(sat.angle) * sat.orbitRadius;
             const z = Math.sin(sat.angle) * sat.orbitRadius;
-            const y = Math.sin(sat.angle * 2) * 25;
+            const y = Math.sin(sat.angle * 2) * 32;
             sat.mesh.position.set(x, y, z);
             sat.mesh.rotation.y = -sat.angle;
           });
         }
 
-        // Animate thermal hotspot pulse rings
+        // Pulse thermal hotspots
         if (showThermalHotspots) {
           thermalHotspotMeshes.forEach((spot, idx) => {
-            const scaleFactor = 1 + Math.sin(time * spot.speed + idx) * 0.4;
+            const scaleFactor = 1 + Math.sin(time * spot.speed + idx) * 0.45;
             spot.mesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
           });
         }
@@ -739,61 +538,19 @@ export default function EarthGlobe3D({
       animFrameRef.current = requestAnimationFrame(tick);
 
       const ringsData = [
-        {
-          lat: cfg.peak.lat,
-          lng: cfg.peak.lng,
-          maxR: 9.5,
-          propagationSpeed: 2.2,
-          repeatPeriod: 1000,
-          color: "#f59e0b",
-        },
-        {
-          lat: regionA.lat,
-          lng: regionA.lon,
-          maxR: 4.5,
-          propagationSpeed: 1.8,
-          repeatPeriod: 1200,
-          color: isHotA ? "#e11d48" : "#0284c7",
-        },
-        {
-          lat: regionB.lat,
-          lng: regionB.lon,
-          maxR: 4.5,
-          propagationSpeed: 1.8,
-          repeatPeriod: 1200,
-          color: isHotB ? "#f97316" : "#06b6d4",
-        },
+        { lat: cfg.peak.lat, lng: cfg.peak.lng, maxR: 9.5, propagationSpeed: 2.2, repeatPeriod: 1000, color: "#f59e0b" },
+        { lat: regionA.lat, lng: regionA.lon, maxR: 4.5, propagationSpeed: 1.8, repeatPeriod: 1200, color: isHotA ? "#e11d48" : "#0284c7" },
+        { lat: regionB.lat, lng: regionB.lon, maxR: 4.5, propagationSpeed: 1.8, repeatPeriod: 1200, color: isHotB ? "#f97316" : "#06b6d4" },
       ];
 
       const labelsData = [
-        {
-          lat: regionA.lat,
-          lng: regionA.lon,
-          text: `A: ${regionA.name.split(",")[0]} (${rateA > 0 ? "+" : ""}${rateA} ${unit})`,
-          size: 1.05,
-        },
-        {
-          lat: regionB.lat,
-          lng: regionB.lon,
-          text: `B: ${regionB.name.split(",")[0]} (${rateB > 0 ? "+" : ""}${rateB} ${unit})`,
-          size: 1.05,
-        },
-        {
-          lat: cfg.peak.lat,
-          lng: cfg.peak.lng,
-          text: `#1 GLOBAL PEAK: ${cfg.peak.name.split(",")[0]}`,
-          size: 1.15,
-        },
+        { lat: regionA.lat, lng: regionA.lon, text: `A: ${regionA.name.split(",")[0]} (${rateA > 0 ? "+" : ""}${rateA} ${unit})`, size: 1.05 },
+        { lat: regionB.lat, lng: regionB.lon, text: `B: ${regionB.name.split(",")[0]} (${rateB > 0 ? "+" : ""}${rateB} ${unit})`, size: 1.05 },
+        { lat: cfg.peak.lat, lng: cfg.peak.lng, text: `#1 GLOBAL PEAK: ${cfg.peak.name.split(",")[0]}`, size: 1.15 },
       ];
 
       const arcsData = [
-        {
-          startLat: regionA.lat,
-          startLng: regionA.lon,
-          endLat: regionB.lat,
-          endLng: regionB.lon,
-          color: ["rgba(2, 132, 199, 0.7)", "rgba(225, 29, 72, 0.7)"],
-        },
+        { startLat: regionA.lat, startLng: regionA.lon, endLat: regionB.lat, endLng: regionB.lon, color: ["rgba(56, 189, 248, 0.7)", "rgba(244, 63, 94, 0.7)"] },
       ];
 
       globe
@@ -844,10 +601,7 @@ export default function EarthGlobe3D({
     if (!globeInstanceRef.current) return;
     globeInstanceRef.current.controls().autoRotate = false;
     setAutoRotate(false);
-    globeInstanceRef.current.pointOfView(
-      { lat: cfg.peak.lat, lng: cfg.peak.lng, altitude: 1.55 },
-      1200
-    );
+    globeInstanceRef.current.pointOfView({ lat: cfg.peak.lat, lng: cfg.peak.lng, altitude: 1.55 }, 1200);
     if (onInspectGlobalPeak) {
       onInspectGlobalPeak(cfg.peak.lat, cfg.peak.lng, cfg.peak.name);
     }
@@ -865,9 +619,7 @@ export default function EarthGlobe3D({
   const renderLiveStatusBadge = (w: LiveWeatherTelemetry | null) => {
     if (!w) return "Syncing live telemetry...";
     if (parameter === "PRECTOTCORR") {
-      return w.precipitation > 0
-        ? `Raining Now (${w.precipitation} mm/h)`
-        : `No Rain Now (Dry • ${w.cloudCover}% clouds)`;
+      return w.precipitation > 0 ? `Raining Now (${w.precipitation} mm/h)` : `No Rain Now (Dry • ${w.cloudCover}% clouds)`;
     }
     if (parameter === "QV2M") {
       const towardDeg = (w.windDirectionDeg + 180) % 360;
@@ -883,35 +635,35 @@ export default function EarthGlobe3D({
   };
 
   return (
-    <div className="relative w-full h-[440px] sm:h-[470px] flex items-center justify-center bg-gradient-to-b from-sky-100/80 via-white to-slate-100/90 rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
+    <div className="relative w-full h-[440px] sm:h-[470px] flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 rounded-3xl border border-slate-800 shadow-xl overflow-hidden text-slate-100">
       <div
         ref={containerRef}
         className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing z-10"
       />
 
       {/* Option 1: Global Climatological #1 Hotspot (Top-Left) */}
-      <div className="absolute top-3.5 left-3.5 z-20 bg-white/95 backdrop-blur-md border border-amber-300 shadow-md rounded-2xl p-3 max-w-[245px]">
+      <div className="absolute top-3.5 left-3.5 z-20 bg-slate-900/90 backdrop-blur-md border border-amber-500/40 shadow-lg rounded-2xl p-3 max-w-[245px]">
         <div className="flex items-center gap-2">
-          <span className="p-1.5 rounded-xl bg-amber-100 text-amber-700 shrink-0">
+          <span className="p-1.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
             <Trophy className="w-4 h-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">
               1. Global #1 Benchmark Peak
             </p>
-            <p className="text-xs font-bold text-slate-900 truncate">
+            <p className="text-xs font-bold text-slate-100 truncate">
               {cfg.peak.name}
             </p>
           </div>
         </div>
-        <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-extrabold text-slate-800">
+        <div className="mt-1.5 pt-1.5 border-t border-slate-800 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-extrabold text-amber-300">
             {cfg.peak.percentage}
           </span>
           <button
             type="button"
             onClick={flyToGlobalPeak}
-            className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg transition shrink-0"
+            className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 px-2.5 py-1 rounded-lg transition shrink-0 shadow"
           >
             Fly &amp; Load
           </button>
@@ -919,38 +671,38 @@ export default function EarthGlobe3D({
       </div>
 
       {/* Option 2: Live Synoptic Weather Right Now (Top-Right) */}
-      <div className="hidden sm:flex flex-col gap-1.5 absolute top-3.5 right-3.5 z-20 bg-white/95 backdrop-blur-md border border-sky-200 shadow-sm rounded-2xl p-3 max-w-[260px]">
-        <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-1">
+      <div className="hidden sm:flex flex-col gap-1.5 absolute top-3.5 right-3.5 z-20 bg-slate-900/90 backdrop-blur-md border border-sky-500/30 shadow-lg rounded-2xl p-3 max-w-[260px]">
+        <div className="flex items-center justify-between gap-1.5 border-b border-slate-800 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <Satellite className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 truncate">
+            <Satellite className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400 truncate">
               2. Live Weather (Right Now)
             </span>
           </div>
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
         </div>
 
         <div className="text-[10px] space-y-1">
-          <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+          <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
             {parameter === "PRECTOTCORR" ? (
-              <CloudRain className="w-3 h-3 text-sky-600 shrink-0" />
+              <CloudRain className="w-3 h-3 text-sky-400 shrink-0" />
             ) : parameter === "QV2M" ? (
-              <Wind className="w-3 h-3 text-indigo-600 shrink-0" />
+              <Wind className="w-3 h-3 text-indigo-400 shrink-0" />
             ) : (
-              <Sun className="w-3 h-3 text-amber-500 shrink-0" />
+              <Sun className="w-3 h-3 text-amber-400 shrink-0" />
             )}
             <span className="truncate">
               <b>A:</b> {renderLiveStatusBadge(liveA)}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+          <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
             {parameter === "PRECTOTCORR" ? (
-              <CloudRain className="w-3 h-3 text-rose-600 shrink-0" />
+              <CloudRain className="w-3 h-3 text-rose-400 shrink-0" />
             ) : parameter === "QV2M" ? (
-              <Wind className="w-3 h-3 text-indigo-600 shrink-0" />
+              <Wind className="w-3 h-3 text-indigo-400 shrink-0" />
             ) : (
-              <Sun className="w-3 h-3 text-amber-500 shrink-0" />
+              <Sun className="w-3 h-3 text-amber-400 shrink-0" />
             )}
             <span className="truncate">
               <b>B:</b> {renderLiveStatusBadge(liveB)}
@@ -960,44 +712,36 @@ export default function EarthGlobe3D({
       </div>
 
       {/* Option 3: 40-Year NASA POWER Climate Trajectory (Bottom-Right) */}
-      <div className="absolute bottom-3.5 right-3.5 z-20 bg-white/95 backdrop-blur-md border border-slate-200 shadow-md rounded-2xl px-3.5 py-2.5 space-y-1.5 min-w-[225px]">
-        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1">
+      <div className="absolute bottom-3.5 right-3.5 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-800 shadow-lg rounded-2xl px-3.5 py-2.5 space-y-1.5 min-w-[225px]">
+        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1">
           3. NASA POWER 40-Yr Trend (/dec)
         </p>
 
         <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="flex items-center gap-1 font-bold text-slate-700 truncate max-w-[115px]">
+          <span className="flex items-center gap-1 font-bold text-slate-300 truncate max-w-[115px]">
             {isHotA ? (
-              <Flame className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <Flame className="w-3.5 h-3.5 text-rose-500 shrink-0" />
             ) : (
-              <Snowflake className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+              <Snowflake className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             )}
             A: {regionA.name.split(",")[0]}
           </span>
-          <span
-            className={`font-mono font-extrabold ${
-              isHotA ? "text-rose-600" : "text-sky-600"
-            }`}
-          >
+          <span className={`font-mono font-extrabold ${isHotA ? "text-rose-400" : "text-sky-400"}`}>
             {rateA > 0 ? "+" : ""}
             {rateA} {unit}
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-3 text-xs border-t border-slate-100 pt-1.5">
-          <span className="flex items-center gap-1 font-bold text-slate-700 truncate max-w-[115px]">
+        <div className="flex items-center justify-between gap-3 text-xs border-t border-slate-800 pt-1.5">
+          <span className="flex items-center gap-1 font-bold text-slate-300 truncate max-w-[115px]">
             {isHotB ? (
-              <Flame className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+              <Flame className="w-3.5 h-3.5 text-orange-500 shrink-0" />
             ) : (
-              <Snowflake className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+              <Snowflake className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             )}
             B: {regionB.name.split(",")[0]}
           </span>
-          <span
-            className={`font-mono font-extrabold ${
-              isHotB ? "text-orange-600" : "text-cyan-600"
-            }`}
-          >
+          <span className={`font-mono font-extrabold ${isHotB ? "text-orange-400" : "text-cyan-400"}`}>
             {rateB > 0 ? "+" : ""}
             {rateB} {unit}
           </span>
@@ -1008,15 +752,15 @@ export default function EarthGlobe3D({
       <button
         type="button"
         onClick={focusRegions}
-        className="absolute bottom-3.5 left-3.5 z-20 flex items-center gap-1.5 bg-white/95 hover:bg-white backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-3 py-1.5 text-[11px] font-bold text-slate-700 transition"
+        className="absolute bottom-3.5 left-3.5 z-20 flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-slate-700 shadow-lg rounded-full px-3 py-1.5 text-[11px] font-bold text-slate-200 transition"
       >
         {autoRotate ? (
           <Compass
-            className="w-3.5 h-3.5 text-sky-600 animate-spin"
+            className="w-3.5 h-3.5 text-sky-400 animate-spin"
             style={{ animationDuration: "8s" }}
           />
         ) : (
-          <LocateFixed className="w-3.5 h-3.5 text-sky-600" />
+          <LocateFixed className="w-3.5 h-3.5 text-sky-400" />
         )}
         <span>{autoRotate ? "Orbiting Regions" : "Focus Pin A & B"}</span>
       </button>
