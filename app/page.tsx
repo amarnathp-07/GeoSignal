@@ -174,39 +174,6 @@ const VARIABLES = [
   },
 ];
 
-// NASA GIBS Satellite Layers (Matching user request[cite: 11])
-const NASA_GIBS_LAYERS = {
-  none: { name: "No NASA layer", url: "" },
-  trueColor: {
-    name: "True colour (MODIS Terra)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg",
-  },
-  ndvi: {
-    name: "Vegetation NDVI (monthly)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  landTemp: {
-    name: "Land surface temperature (monthly)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Land_Surface_Temp_Day/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  chlorophyll: {
-    name: "Chlorophyll-a (VIIRS NOAA-20)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Chlorophyll_A/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  precipitation: {
-    name: "Precipitation rate (GPM IMERG)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GPM_3IMERGHHL_precipitation/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  soilMoisture: {
-    name: "Root-zone soil moisture (SMAP L4)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Root_Zone_Soil_Moisture/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  aerosol: {
-    name: "Aerosol optical depth (MODIS)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Aerosol/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-};
-
 const BIOME_PRESETS = [
   {
     id: "desert-forest",
@@ -388,10 +355,6 @@ export default function ClimateDashboard() {
   const [yearEnd, setYearEnd] = useState<number>(2025);
   const [seasonFilter, setSeasonFilter] = useState<"all" | "summer" | "winter">("all");
 
-  // NASA GIBS Map Layer State (matching user request[cite: 11])
-  const [selectedGibsLayer, setSelectedGibsLayer] = useState<string>("chlorophyll");
-  const [layerOpacity, setLayerOpacity] = useState<number>(0.8);
-
   const [aiQuery, setAiQuery] = useState<string>("");
   const [aiChatLog, setAiChatLog] = useState<{ role: string; text: string }[]>([
     { role: "assistant", text: "Hello! I am GeoSignal AI. Ask me anything about satellite anomalies, tsunami predictions, earthquake zones, or Mann-Kendall statistics!" }
@@ -410,7 +373,6 @@ export default function ClimateDashboard() {
 
   const activeVar = VARIABLES.find((v) => v.id === parameter) || VARIABLES[0];
 
-  // URL Deep-Link State Hydration on Mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pParam = params.get("param");
@@ -440,7 +402,6 @@ export default function ClimateDashboard() {
     }
   }, []);
 
-  // Sync state changes to URL query parameters for deep-linking
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("param", parameter);
@@ -630,14 +591,12 @@ export default function ClimateDashboard() {
       let reply = "";
       const statsA = dataA?.statistics;
 
-      if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("hazard") || lower.includes("predict") || lower.includes("wave") || lower.includes("place") || lower.includes("where") || lower.includes("occur") || lower.includes("list")) {
-        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed. Currently monitoring high-risk zones across the Pacific Ring of Fire (Aleutian Islands, Tohoku Trench, and Central Chile) where directional sea-flow vectors and inundation runups are computed in real time.`;
-      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil") || lower.includes("humidity") || lower.includes("trend") || lower.includes("slope") || lower.includes("p-value") || lower.includes("current")) {
-        reply = `NASA POWER Telemetry for your currently selected region (${regionA.name}) analyzing ${activeVar.label}: The decadal Sen's slope rate is ${statsA?.rate_per_decade} ${activeVar.unit}/decade with a Mann-Kendall Z-score of ${statsA?.z_score}σ (p-value = ${statsA?.p_value.toFixed(4)}). ${statsA?.is_significant ? "This trend is statistically significant (p < 0.05)." : "This trend falls within natural climate variability."}`;
-      } else if (lower.includes("tech") || lower.includes("stack") || lower.includes("built") || lower.includes("tools")) {
-        reply = `GeoSignal is built using Next.js App Router, React, Tailwind CSS, Recharts, and Canvas API for 3D globe rendering. The backend connects to NASA POWER and USGS live seismic feeds.`;
+      if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("hazard") || lower.includes("predict") || lower.includes("wave")) {
+        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed.`;
+      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil") || lower.includes("trend")) {
+        reply = `NASA POWER Telemetry for ${regionA.name} analyzing ${activeVar.label}: Sen's slope rate is ${statsA?.rate_per_decade} ${activeVar.unit}/decade with Mann-Kendall Z = ${statsA?.z_score}σ (p = ${statsA?.p_value.toFixed(4)}).`;
       } else {
-        reply = `Regarding your query ("${userMsg}") for ${regionA.name}: GeoSignal combines multi-decadal NASA POWER reanalysis data with real-time USGS seismic feeds. For ${activeVar.label}, our Mann-Kendall analysis indicates a rate of ${statsA?.rate_per_decade} ${activeVar.unit}/decade (p = ${statsA?.p_value.toFixed(4)}). How else can I assist your investigation?`;
+        reply = `Regarding your query ("${userMsg}") for ${regionA.name}: GeoSignal combines multi-decadal NASA POWER reanalysis with real-time USGS seismic feeds. How else can I assist?`;
       }
 
       setAiChatLog(prev => [...prev, { role: "assistant", text: reply }]);
@@ -649,23 +608,16 @@ export default function ClimateDashboard() {
     const text = `NASA SPACE APPS CHALLENGE — EARTH SYSTEM TREND DETECTIVE BRIEF
 =====================================================================
 Variable Analyzed : ${activeVar.label} (${parameter})
-Observation Window: ${yearStart}–${yearEnd} (Multi-Decadal Satellite/Reanalysis)
+Observation Window: ${yearStart}–${yearEnd}
 Cross-Region Link : Pearson r = ${pearsonR}
 
-REGION A: ${regionA.name} (${regionA.lat}°, ${regionA.lon}°)
-- Decadal Rate (Sen's Slope): ${dataA.statistics.rate_per_decade} ${activeVar.unit}/decade
-- Mann-Kendall Z / p-value  : Z = ${dataA.statistics.z_score}, p = ${dataA.statistics.p_value}
-- Statistical Significance  : ${dataA.statistics.is_significant ? "Significant (p < 0.05)" : "Natural Variability (p >= 0.05)"}
+REGION A: ${regionA.name}
+- Decadal Rate: ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec
+- Mann-Kendall Z: ${dataA.statistics.z_score}, p = ${dataA.statistics.p_value}
 
-REGION B: ${regionB.name} (${regionB.lat}°, ${regionB.lon}°)
-- Decadal Rate (Sen's Slope): ${dataB.statistics.rate_per_decade} ${activeVar.unit}/decade
-- Mann-Kendall Z / p-value  : Z = ${dataB.statistics.z_score}, p = ${dataB.statistics.p_value}
-- Statistical Significance  : ${dataB.statistics.is_significant ? "Significant (p < 0.05)" : "Natural Variability (p >= 0.05)"}
-
-SCIENTIFIC SYNTHESIS:
-- ${synthesis.headline}
-- Physical Mechanism: ${synthesis.mechanism}
-- Recommended Next Investigation: ${synthesis.nextStep}
+REGION B: ${regionB.name}
+- Decadal Rate: ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec
+- Mann-Kendall Z: ${dataB.statistics.z_score}, p = ${dataB.statistics.p_value}
 `;
     const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -697,7 +649,6 @@ SCIENTIFIC SYNTHESIS:
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
             h3 { font-size: 14px; text-transform: uppercase; color: #334155; margin-top: 0; }
             .metric { font-size: 18px; font-weight: bold; color: #0f172a; margin: 5px 0; font-family: monospace; }
-            .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; background: #e0f2fe; color: #0369a1; }
             .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
           </style>
         </head>
@@ -717,19 +668,16 @@ SCIENTIFIC SYNTHESIS:
               <h3>Region A: ${regionA.name}</h3>
               <div class="metric">Rate: ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
               <p>Mann-Kendall Z: ${dataA.statistics.z_score}σ (p = ${dataA.statistics.p_value})</p>
-              <span class="badge">${dataA.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}</span>
             </div>
-
             <div class="section">
               <h3>Region B: ${regionB.name}</h3>
               <div class="metric">Rate: ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
               <p>Mann-Kendall Z: ${dataB.statistics.z_score}σ (p = ${dataB.statistics.p_value})</p>
-              <span class="badge">${dataB.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}</span>
             </div>
           </div>
 
           <div class="footer">
-            Generated via GeoSignal (geosignal2.vercel.app) • Powered by NASA POWER Reanalysis &amp; USGS Seismic Telemetry
+            Generated via GeoSignal • Powered by NASA POWER Reanalysis &amp; USGS Seismic Telemetry
           </div>
           <script>
             window.onload = function() { window.print(); };
@@ -791,11 +739,9 @@ SCIENTIFIC SYNTHESIS:
               <Globe2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
-                  GeoSignal — Earth System Trend Detective
-                </h1>
-              </div>
+              <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
+                GeoSignal — Earth System Trend Detective
+              </h1>
               <p className="text-xs text-slate-500">
                 Multi-Decadal Satellite Telemetry, Mann-Kendall Statistics &amp; Disaster Early Warning
               </p>
@@ -865,7 +811,7 @@ SCIENTIFIC SYNTHESIS:
       {/* Data Provenance & Methodology Modal */}
       {showMethodologyModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 relative">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-sky-600" />
@@ -881,36 +827,22 @@ SCIENTIFIC SYNTHESIS:
                 <X className="w-4 h-4" />
               </button>
             </div>
-
             <div className="space-y-3 text-xs sm:text-sm text-slate-600 leading-relaxed max-h-[65vh] overflow-y-auto pr-2">
-              <p>
-                <strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge to serve as an authoritative Earth Systems Trend Detective and disaster management dashboard.
-              </p>
+              <p><strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge.</p>
               <div>
                 <h4 className="font-extrabold text-slate-900 mb-1">1. NASA POWER Climate Telemetry</h4>
-                <p>
-                  Variables such as Surface Air Temperature (T2M), Precipitation (PRECTOTCORR), and Root Zone Soil Wetness (GWETROOT) are sourced directly from NASA POWER (Prediction of Worldwide Energy Resources) reanalysis datasets, providing multi-decadal observation consistency from 1985 to present.
-                </p>
+                <p>Sourced directly from NASA POWER reanalysis datasets, providing multi-decadal observation consistency from 1985 to present.</p>
               </div>
               <div>
-                <h4 className="font-extrabold text-slate-900 mb-1">2. Mann-Kendall &amp; Sen’s Slope Statistics</h4>
-                <p>
-                  To separate genuine climate trajectories from natural interannual variability, our backend computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at the standard p &lt; 0.05 threshold.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-slate-900 mb-1">3. Live USGS Seismic &amp; NOAA DART Hydrodynamic Proxies</h4>
-                <p>
-                  The Tsunami Radar integrates live global earthquake feeds from the U.S. Geological Survey (USGS). Wave runups and directional sea-flow vectors are calculated using NOAA DART tsunami proxy equations proportional to earthquake magnitude and subduction focal depth.
-                </p>
+                <h4 className="font-extrabold text-slate-900 mb-1">2. Mann-Kendall Statistics</h4>
+                <p>Computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at p &lt; 0.05.</p>
               </div>
             </div>
-
             <div className="pt-3 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowMethodologyModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer shadow-sm"
+                className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer"
               >
                 Got It
               </button>
@@ -921,7 +853,7 @@ SCIENTIFIC SYNTHESIS:
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6">
         
-        {/* Explicit 5-Step Trend Detective Workflow Bar */}
+        {/* Workflow Status Bar */}
         <section className="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white rounded-3xl p-5 shadow-lg border border-slate-700">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -965,7 +897,7 @@ SCIENTIFIC SYNTHESIS:
           </div>
         </section>
 
-        {/* Control Bar: Variable Pills + Time Baseline Sliders + Seasonality Filters */}
+        {/* Control Bar */}
         {!presentationMode && (
           <section className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1162,7 +1094,7 @@ SCIENTIFIC SYNTHESIS:
           </section>
         )}
 
-        {/* Hero Spatial Stage: Instant Tab Switcher (3D Globe | Tsunami Radar | AI Assistant) */}
+        {/* Hero Spatial Stage: 3D Globe & Original Interactive World Map */}
         <section
           ref={globeSectionRef}
           className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"
@@ -1182,18 +1114,18 @@ SCIENTIFIC SYNTHESIS:
                 onClick={() => setActiveTab("tsunami")}
                 className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "tsunami" ? "bg-rose-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
-                <Waves className="w-4 h-4" /> Live Tsunami &amp; Earthquake Radar
+                <Waves className="w-4 h-4" /> Live Tsunami Radar
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("ai")}
                 className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "ai" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
-                <Sparkles className="w-4 h-4" /> GeoSignal AI Assistant
+                <Sparkles className="w-4 h-4" /> AI Assistant
               </button>
             </div>
 
-            {/* Live USGS Seismic Tsunami Radar Tab with Automated Risk Classification Matrix */}
+            {/* Tsunami Radar Tab */}
             <div className={`bg-white text-slate-900 rounded-3xl p-8 border border-slate-200/90 flex-col justify-between shadow-2xs ${activeTab === "tsunami" ? "flex" : "hidden"}`}>
               <div className="flex items-center justify-between mb-4">
                 <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-rose-600">
@@ -1204,31 +1136,6 @@ SCIENTIFIC SYNTHESIS:
                 </span>
               </div>
               <TsunamiGlobe3D />
-              
-              {/* Automated Seismic Hazard & Risk Classification Matrix */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-600 text-white uppercase">
-                    Severe Warning
-                  </span>
-                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude ≥ 7.0 / Subduction</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Triggers immediate hydrodynamic sea-flow runup simulations and evacuation alerts.</p>
-                </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950 uppercase">
-                    Moderate Advisory
-                  </span>
-                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude 5.5 – 6.9</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Monitors coastal displacement velocity and minor tidal anomaly anomalies.</p>
-                </div>
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white uppercase">
-                    Low Risk / Background
-                  </span>
-                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude &lt; 5.5</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Normal tectonic activity recorded across standard global seismic stations.</p>
-                </div>
-              </div>
             </div>
 
             {/* AI Assistant Tab */}
@@ -1253,7 +1160,7 @@ SCIENTIFIC SYNTHESIS:
                   type="text"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="Ask anything about tsunamis, earthquakes, climate trends, p-values..."
+                  placeholder="Ask anything about tsunamis, earthquakes, climate trends..."
                   className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
                 <button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3 rounded-xl text-xs transition cursor-pointer">
@@ -1262,9 +1169,9 @@ SCIENTIFIC SYNTHESIS:
               </form>
             </div>
 
-            {/* 3D Globe & Map Tab with NASA GIBS Multi-Layer Selector[cite: 11] */}
+            {/* 3D Globe Tab with Original WorldMap */}
             <div className={`grid-cols-1 lg:grid-cols-12 gap-6 items-stretch ${activeTab === "globe" ? "grid" : "hidden"}`}>
-              <div className="lg:col-span-6 relative">
+              <div className="lg:col-span-6">
                 <EarthGlobe3D
                   parameter={parameter}
                   regionA={regionA}
@@ -1273,50 +1180,14 @@ SCIENTIFIC SYNTHESIS:
                   rateB={dataB?.statistics.rate_per_decade}
                   unit={activeVar.unit}
                   variableLabel={activeVar.short}
-                  gibsLayer={selectedGibsLayer}
-                  gibsOpacity={layerOpacity}
+                  gibsLayer="chlorophyll"
+                  gibsOpacity={0.8}
                   onInspectGlobalPeak={(lat, lon, peakName) => {
                     setRegionA({ name: peakName, lat, lon });
                     setActiveBiome("global-peak");
                     setMultiScan(null);
                   }}
                 />
-
-                {/* Floating NASA GIBS Multi-Layer Selector & Opacity Slider over Globe */}
-                <div className="absolute top-4 left-4 z-30 bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-slate-700 shadow-2xl w-72 space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-sky-400 mb-1">
-                      NASA Satellite Layer
-                    </label>
-                    <select
-                      value={selectedGibsLayer}
-                      onChange={(e) => setSelectedGibsLayer(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-sky-500"
-                    >
-                      {Object.entries(NASA_GIBS_LAYERS).map(([key, layer]) => (
-                        <option key={key} value={key}>
-                          {layer.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Layer Opacity</span>
-                      <span className="text-[10px] text-sky-400 font-mono">{Math.round(layerOpacity * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="1.0"
-                      step="0.05"
-                      value={layerOpacity}
-                      onChange={(e) => setLayerOpacity(parseFloat(e.target.value))}
-                      className="w-full accent-sky-500 cursor-pointer"
-                    />
-                  </div>
-                </div>
               </div>
 
               <div className="lg:col-span-6 bg-white rounded-3xl border border-slate-200/90 p-4 shadow-2xs flex flex-col justify-between space-y-3">
@@ -1476,15 +1347,6 @@ SCIENTIFIC SYNTHESIS:
               }`}
             >
               12m Trend
-            </button>
-
-            <button
-              type="button"
-              onClick={exportCaseStudyBrief}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-sky-600" />
-              <span>Report</span>
             </button>
 
             <button
