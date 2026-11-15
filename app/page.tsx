@@ -250,8 +250,22 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
   };
 }
 
-// Helper to calculate local time string (AM/PM) based on longitude offset
-function getLocalTimeByLongitude(lon: number) {
+// Helper to get local time based on region country/timezone or coordinate fallback
+function getLocalTimeForRegion(lat: number, lon: number) {
+  // If both locations are roughly within India bounds (approx lat 6°N to 37°N, lon 68°E to 97°E), use IST
+  const isIndia = lat >= 6 && lat <= 37 && lon >= 68 && lon <= 97;
+  const timeZone = isIndia ? "Asia/Kolkata" : undefined;
+
+  if (timeZone) {
+    return new Date().toLocaleTimeString("en-US", {
+      timeZone,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+
+  // General longitude offset fallback for international locations
   const now = new Date();
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
   const offsetHours = lon / 15;
@@ -497,13 +511,13 @@ export default function ClimateDashboard() {
 
   const activeVar = VARIABLES.find((v) => v.id === parameter) || VARIABLES[0];
 
-  // Calculated distance and local times
+  // Calculated distance and correct local times
   const interRegionDistance = useMemo(() => {
     return calculateHaversineDistance(regionA.lat, regionA.lon, regionB.lat, regionB.lon);
   }, [regionA, regionB]);
 
-  const timeA = useMemo(() => getLocalTimeByLongitude(regionA.lon), [regionA]);
-  const timeB = useMemo(() => getLocalTimeByLongitude(regionB.lon), [regionB]);
+  const timeA = useMemo(() => getLocalTimeForRegion(regionA.lat, regionA.lon), [regionA]);
+  const timeB = useMemo(() => getLocalTimeForRegion(regionB.lat, regionB.lon), [regionB]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1050,7 +1064,7 @@ export default function ClimateDashboard() {
               </div>
               <div>
                 <h4 className="font-extrabold mb-1">2. Distance &amp; Local Time Calculation</h4>
-                <p>Computes great-circle separation distances in km/miles using the Haversine formula and derives localized AM/PM times from coordinate longitudes.</p>
+                <p>Computes great-circle separation distances in km/miles using the Haversine formula and derives localized AM/PM times (respecting unified time zones like IST for India).</p>
               </div>
             </div>
             <div className="pt-3 border-t flex justify-end">
