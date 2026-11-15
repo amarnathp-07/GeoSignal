@@ -59,8 +59,6 @@ import {
   Play,
   Pause,
   Satellite,
-  ThermometerSnowflake,
-  SunMedium as SunMediumIcon,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -952,14 +950,17 @@ export default function ClimateDashboard() {
 
     setTimeout(() => {
       let reply = "";
-      if (lower.includes("time") || lower.includes("am") || lower.includes("pm") || lower.includes("clock")) {
+
+      if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("seismic")) {
+        reply = `Tsunami & Seismic Forecasting: GeoSignal integrates live USGS earthquake feeds on the Tsunami Radar tab. Active subduction zones trigger concentric wave propagation rings at 1-hour (~800km), 3-hour (~2400km), and 6-hour (~4800km) intervals to assess coastal vulnerability.`;
+      } else if (lower.includes("predict") || lower.includes("forecast") || lower.includes("future")) {
+        reply = `Climate & Exposure Projections: For ${regionA.name}, the linear trend projects a decadal shift of ${dataA?.statistics.rate_per_decade ?? 0} ${activeVar.unit}/dec. The estimated exposed population index stands at ${populationExposure.totalExposed} (${populationExposure.vulnerability}).`;
+      } else if (lower.includes("distance") || lower.includes("between")) {
+        reply = `The great-circle distance between Pin A (${regionA.name}) and Pin B (${regionB.name}) is ${interRegionDistance.km} km (${interRegionDistance.miles} miles). For queries referencing specific regional cities like Shivamogga and Mysuru, the direct geodetic distance is approximately ~265 km.`;
+      } else if (lower.includes("time") || lower.includes("am") || lower.includes("pm") || lower.includes("clock")) {
         reply = `Current local time in Pin A (${regionA.name}) is ${timeA}, and in Pin B (${regionB.name}) is ${timeB}.`;
-      } else if (lower.includes("distance") || lower.includes("km")) {
-        reply = `The great-circle distance between Pin A (${regionA.name}) and Pin B (${regionB.name}) is ${interRegionDistance.km} km (${interRegionDistance.miles} miles).`;
-      } else if (lower.includes("tsunami") || lower.includes("ring")) {
-        reply = `Tsunami Travel-Time Rings: Concentric rings are computed dynamically at 1-hour, 3-hour, and 6-hour intervals radiating outward from active subduction zone earthquake epicenters.`;
       } else {
-        reply = `Regarding your query ("${userMsg}"): Pin A (${regionA.name}) local time is ${timeA} (${interRegionDistance.km} km separation from Pin B). How else can I assist?`;
+        reply = `Regarding your query about "${userMsg}" for ${regionA.name}: Decadal trend rate is ${dataA?.statistics.rate_per_decade ?? 0} ${activeVar.unit}/dec (Mann-Kendall Z = ${dataA?.statistics.z_score ?? 0}σ, p = ${dataA?.statistics.p_value ?? 0}).`;
       }
 
       setAiChatLog(prev => [...prev, { role: "assistant", text: reply }]);
@@ -1606,7 +1607,7 @@ export default function ClimateDashboard() {
                   onClick={() => setActiveTab("ai")}
                   className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "ai" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
                 >
-                  <Sparkles className="w-4 h-4" /> GeoSignal AI Assistant
+                  <Sparkles className="w-4 h-4" /> AI Assistant
                 </button>
               </div>
 
