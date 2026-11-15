@@ -59,6 +59,8 @@ import {
   Play,
   Pause,
   Satellite,
+  ThermometerSnowflake,
+  SunMedium as SunMediumIcon,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -1553,11 +1555,11 @@ export default function ClimateDashboard() {
               <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
                 Inter-Region Separation Distance &amp; Local AM/PM Times
               </h3>
-              <p className="text-sm font-bold mt-0.5 flex flex-wrap items-center gap-2">
+             <p className="text-sm font-bold mt-0.5 flex flex-wrap items-center gap-2">
                 <span>{regionA.name} <span className="text-sky-400 font-mono">({timeA})</span></span>
                 <span className="text-slate-400">↔</span>
                 <span>{regionB.name} <span className="text-rose-400 font-mono">({timeB})</span></span>
-              </p>
+             </p>
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs">
@@ -1682,6 +1684,7 @@ export default function ClimateDashboard() {
               <div className="lg:col-span-6 relative">
                 <EarthGlobe3D
                   parameter={parameter}
+                  onParameterChange={(newParam) => setParameter(newParam)}
                   regionA={regionA}
                   regionB={regionB}
                   rateA={dataA?.statistics.rate_per_decade}
@@ -1758,7 +1761,6 @@ export default function ClimateDashboard() {
                     }}
                     onSelectRegionB={(lat, lon) => {
                       setRegionB({ name: `Custom (${lat}°, ${lon}°)`, lat, lon });
-                      setActiveBiome("custom");
                     }}
                   />
                 </div>
