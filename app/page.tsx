@@ -174,39 +174,6 @@ const VARIABLES = [
   },
 ];
 
-// NASA GIBS Satellite Layers (Matching user request[cite: 11])
-const NASA_GIBS_LAYERS = {
-  none: { name: "No NASA layer", url: "" },
-  trueColor: {
-    name: "True colour (MODIS Terra)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg",
-  },
-  ndvi: {
-    name: "Vegetation NDVI (monthly)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  landTemp: {
-    name: "Land surface temperature (monthly)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Land_Surface_Temp_Day/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  chlorophyll: {
-    name: "Chlorophyll-a (VIIRS NOAA-20)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Chlorophyll_A/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  precipitation: {
-    name: "Precipitation rate (GPM IMERG)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GPM_3IMERGHHL_precipitation/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  soilMoisture: {
-    name: "Root-zone soil moisture (SMAP L4)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Root_Zone_Soil_Moisture/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-  aerosol: {
-    name: "Aerosol optical depth (MODIS)",
-    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Aerosol/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
-  },
-};
-
 const BIOME_PRESETS = [
   {
     id: "desert-forest",
@@ -388,10 +355,6 @@ export default function ClimateDashboard() {
   const [yearEnd, setYearEnd] = useState<number>(2025);
   const [seasonFilter, setSeasonFilter] = useState<"all" | "summer" | "winter">("all");
 
-  // NASA GIBS Map Layer State (matching user request[cite: 11])
-  const [selectedGibsLayer, setSelectedGibsLayer] = useState<string>("chlorophyll");
-  const [layerOpacity, setLayerOpacity] = useState<number>(0.8);
-
   const [aiQuery, setAiQuery] = useState<string>("");
   const [aiChatLog, setAiChatLog] = useState<{ role: string; text: string }[]>([
     { role: "assistant", text: "Hello! I am GeoSignal AI. Ask me anything about satellite anomalies, tsunami predictions, earthquake zones, or Mann-Kendall statistics!" }
@@ -410,7 +373,6 @@ export default function ClimateDashboard() {
 
   const activeVar = VARIABLES.find((v) => v.id === parameter) || VARIABLES[0];
 
-  // URL Deep-Link State Hydration on Mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pParam = params.get("param");
@@ -440,7 +402,6 @@ export default function ClimateDashboard() {
     }
   }, []);
 
-  // Sync state changes to URL query parameters for deep-linking
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("param", parameter);
@@ -471,9 +432,7 @@ export default function ClimateDashboard() {
           fetch(`/api/analyze?lat=${latB}&lon=${lonB}&parameter=${param}`),
         ]);
         if (!resA.ok || !resB.ok) {
-          throw new Error(
-            "Unable to fetch NASA POWER analytics from API route."
-          );
+          throw new Error("Unable to fetch NASA POWER analytics from API route.");
         }
         const [jsonA, jsonB]: [AnalysisResponse, AnalysisResponse] =
           await Promise.all([resA.json(), resB.json()]);
@@ -630,14 +589,12 @@ export default function ClimateDashboard() {
       let reply = "";
       const statsA = dataA?.statistics;
 
-      if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("hazard") || lower.includes("predict") || lower.includes("wave") || lower.includes("place") || lower.includes("where") || lower.includes("occur") || lower.includes("list")) {
-        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed. Currently monitoring high-risk zones across the Pacific Ring of Fire (Aleutian Islands, Tohoku Trench, and Central Chile) where directional sea-flow vectors and inundation runups are computed in real time.`;
-      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil") || lower.includes("humidity") || lower.includes("trend") || lower.includes("slope") || lower.includes("p-value") || lower.includes("current")) {
-        reply = `NASA POWER Telemetry for your currently selected region (${regionA.name}) analyzing ${activeVar.label}: The decadal Sen's slope rate is ${statsA?.rate_per_decade} ${activeVar.unit}/decade with a Mann-Kendall Z-score of ${statsA?.z_score}σ (p-value = ${statsA?.p_value.toFixed(4)}). ${statsA?.is_significant ? "This trend is statistically significant (p < 0.05)." : "This trend falls within natural climate variability."}`;
-      } else if (lower.includes("tech") || lower.includes("stack") || lower.includes("built") || lower.includes("tools")) {
-        reply = `GeoSignal is built using Next.js App Router, React, Tailwind CSS, Recharts, and Canvas API for 3D globe rendering. The backend connects to NASA POWER and USGS live seismic feeds.`;
+      if (lower.includes("tsunami") || lower.includes("earthquake") || lower.includes("hazard") || lower.includes("predict") || lower.includes("wave")) {
+        reply = `USGS Seismic & Tsunami Radar Analysis: Major tectonic hazards and subduction zones are actively tracked worldwide via the USGS global seismic feed across the Pacific Ring of Fire.`;
+      } else if (lower.includes("climate") || lower.includes("temperature") || lower.includes("rain") || lower.includes("soil") || lower.includes("trend")) {
+        reply = `NASA POWER Telemetry for ${regionA.name} analyzing ${activeVar.label}: Sen's slope rate is ${statsA?.rate_per_decade} ${activeVar.unit}/decade with Mann-Kendall Z = ${statsA?.z_score}σ (p = ${statsA?.p_value.toFixed(4)}).`;
       } else {
-        reply = `Regarding your query ("${userMsg}") for ${regionA.name}: GeoSignal combines multi-decadal NASA POWER reanalysis data with real-time USGS seismic feeds. For ${activeVar.label}, our Mann-Kendall analysis indicates a rate of ${statsA?.rate_per_decade} ${activeVar.unit}/decade (p = ${statsA?.p_value.toFixed(4)}). How else can I assist your investigation?`;
+        reply = `Regarding your query ("${userMsg}") for ${regionA.name}: GeoSignal combines multi-decadal NASA POWER reanalysis with real-time USGS seismic feeds. How else can I assist?`;
       }
 
       setAiChatLog(prev => [...prev, { role: "assistant", text: reply }]);
@@ -649,23 +606,16 @@ export default function ClimateDashboard() {
     const text = `NASA SPACE APPS CHALLENGE — EARTH SYSTEM TREND DETECTIVE BRIEF
 =====================================================================
 Variable Analyzed : ${activeVar.label} (${parameter})
-Observation Window: ${yearStart}–${yearEnd} (Multi-Decadal Satellite/Reanalysis)
+Observation Window: ${yearStart}–${yearEnd}
 Cross-Region Link : Pearson r = ${pearsonR}
 
 REGION A: ${regionA.name} (${regionA.lat}°, ${regionA.lon}°)
-- Decadal Rate (Sen's Slope): ${dataA.statistics.rate_per_decade} ${activeVar.unit}/decade
-- Mann-Kendall Z / p-value  : Z = ${dataA.statistics.z_score}, p = ${dataA.statistics.p_value}
-- Statistical Significance  : ${dataA.statistics.is_significant ? "Significant (p < 0.05)" : "Natural Variability (p >= 0.05)"}
+- Decadal Rate: ${dataA.statistics.rate_per_decade} ${activeVar.unit}/decade
+- Mann-Kendall Z: ${dataA.statistics.z_score}, p = ${dataA.statistics.p_value}
 
 REGION B: ${regionB.name} (${regionB.lat}°, ${regionB.lon}°)
-- Decadal Rate (Sen's Slope): ${dataB.statistics.rate_per_decade} ${activeVar.unit}/decade
-- Mann-Kendall Z / p-value  : Z = ${dataB.statistics.z_score}, p = ${dataB.statistics.p_value}
-- Statistical Significance  : ${dataB.statistics.is_significant ? "Significant (p < 0.05)" : "Natural Variability (p >= 0.05)"}
-
-SCIENTIFIC SYNTHESIS:
-- ${synthesis.headline}
-- Physical Mechanism: ${synthesis.mechanism}
-- Recommended Next Investigation: ${synthesis.nextStep}
+- Decadal Rate: ${dataB.statistics.rate_per_decade} ${activeVar.unit}/decade
+- Mann-Kendall Z: ${dataB.statistics.z_score}, p = ${dataB.statistics.p_value}
 `;
     const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -717,14 +667,11 @@ SCIENTIFIC SYNTHESIS:
               <h3>Region A: ${regionA.name}</h3>
               <div class="metric">Rate: ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
               <p>Mann-Kendall Z: ${dataA.statistics.z_score}σ (p = ${dataA.statistics.p_value})</p>
-              <span class="badge">${dataA.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}</span>
             </div>
-
             <div class="section">
               <h3>Region B: ${regionB.name}</h3>
               <div class="metric">Rate: ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
               <p>Mann-Kendall Z: ${dataB.statistics.z_score}σ (p = ${dataB.statistics.p_value})</p>
-              <span class="badge">${dataB.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}</span>
             </div>
           </div>
 
@@ -791,11 +738,9 @@ SCIENTIFIC SYNTHESIS:
               <Globe2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
-                  GeoSignal — Earth System Trend Detective
-                </h1>
-              </div>
+              <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
+                GeoSignal — Earth System Trend Detective
+              </h1>
               <p className="text-xs text-slate-500">
                 Multi-Decadal Satellite Telemetry, Mann-Kendall Statistics &amp; Disaster Early Warning
               </p>
@@ -865,7 +810,7 @@ SCIENTIFIC SYNTHESIS:
       {/* Data Provenance & Methodology Modal */}
       {showMethodologyModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 relative">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-sky-600" />
@@ -881,36 +826,22 @@ SCIENTIFIC SYNTHESIS:
                 <X className="w-4 h-4" />
               </button>
             </div>
-
             <div className="space-y-3 text-xs sm:text-sm text-slate-600 leading-relaxed max-h-[65vh] overflow-y-auto pr-2">
-              <p>
-                <strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge to serve as an authoritative Earth Systems Trend Detective and disaster management dashboard.
-              </p>
+              <p><strong>GeoSignal</strong> is engineered for the NASA Space Apps Challenge.</p>
               <div>
                 <h4 className="font-extrabold text-slate-900 mb-1">1. NASA POWER Climate Telemetry</h4>
-                <p>
-                  Variables such as Surface Air Temperature (T2M), Precipitation (PRECTOTCORR), and Root Zone Soil Wetness (GWETROOT) are sourced directly from NASA POWER (Prediction of Worldwide Energy Resources) reanalysis datasets, providing multi-decadal observation consistency from 1985 to present.
-                </p>
+                <p>Sourced directly from NASA POWER reanalysis datasets, providing multi-decadal observation consistency from 1985 to present.</p>
               </div>
               <div>
-                <h4 className="font-extrabold text-slate-900 mb-1">2. Mann-Kendall &amp; Sen’s Slope Statistics</h4>
-                <p>
-                  To separate genuine climate trajectories from natural interannual variability, our backend computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at the standard p &lt; 0.05 threshold.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-slate-900 mb-1">3. Live USGS Seismic &amp; NOAA DART Hydrodynamic Proxies</h4>
-                <p>
-                  The Tsunami Radar integrates live global earthquake feeds from the U.S. Geological Survey (USGS). Wave runups and directional sea-flow vectors are calculated using NOAA DART tsunami proxy equations proportional to earthquake magnitude and subduction focal depth.
-                </p>
+                <h4 className="font-extrabold text-slate-900 mb-1">2. Mann-Kendall Statistics</h4>
+                <p>Computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at p &lt; 0.05.</p>
               </div>
             </div>
-
             <div className="pt-3 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowMethodologyModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer shadow-sm"
+                className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer"
               >
                 Got It
               </button>
@@ -921,7 +852,7 @@ SCIENTIFIC SYNTHESIS:
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6">
         
-        {/* Explicit 5-Step Trend Detective Workflow Bar */}
+        {/* Workflow Status Bar */}
         <section className="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white rounded-3xl p-5 shadow-lg border border-slate-700">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -965,7 +896,7 @@ SCIENTIFIC SYNTHESIS:
           </div>
         </section>
 
-        {/* Control Bar: Variable Pills + Time Baseline Sliders + Seasonality Filters */}
+        {/* Control Bar */}
         {!presentationMode && (
           <section className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1162,7 +1093,7 @@ SCIENTIFIC SYNTHESIS:
           </section>
         )}
 
-        {/* Hero Spatial Stage: Instant Tab Switcher (3D Globe | Tsunami Radar | AI Assistant) */}
+        {/* Hero Spatial Stage: 3D Globe & Original Interactive World Map */}
         <section
           ref={globeSectionRef}
           className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"
@@ -1182,18 +1113,18 @@ SCIENTIFIC SYNTHESIS:
                 onClick={() => setActiveTab("tsunami")}
                 className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "tsunami" ? "bg-rose-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
-                <Waves className="w-4 h-4" /> Live Tsunami &amp; Earthquake Radar
+                <Waves className="w-4 h-4" /> Live Tsunami Radar
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("ai")}
                 className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${activeTab === "ai" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
-                <Sparkles className="w-4 h-4" /> GeoSignal AI Assistant
+                <Sparkles className="w-4 h-4" /> AI Assistant
               </button>
             </div>
 
-            {/* Live USGS Seismic Tsunami Radar Tab with Automated Risk Classification Matrix */}
+            {/* Tsunami Radar Tab */}
             <div className={`bg-white text-slate-900 rounded-3xl p-8 border border-slate-200/90 flex-col justify-between shadow-2xs ${activeTab === "tsunami" ? "flex" : "hidden"}`}>
               <div className="flex items-center justify-between mb-4">
                 <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-rose-600">
@@ -1204,31 +1135,6 @@ SCIENTIFIC SYNTHESIS:
                 </span>
               </div>
               <TsunamiGlobe3D />
-              
-              {/* Automated Seismic Hazard & Risk Classification Matrix */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-600 text-white uppercase">
-                    Severe Warning
-                  </span>
-                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude ≥ 7.0 / Subduction</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Triggers immediate hydrodynamic sea-flow runup simulations and evacuation alerts.</p>
-                </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950 uppercase">
-                    Moderate Advisory
-                  </span>
-                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude 5.5 – 6.9</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Monitors coastal displacement velocity and minor tidal anomaly anomalies.</p>
-                </div>
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white uppercase">
-                    Low Risk / Background
-                  </span>
-                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude &lt; 5.5</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Normal tectonic activity recorded across standard global seismic stations.</p>
-                </div>
-              </div>
             </div>
 
             {/* AI Assistant Tab */}
@@ -1253,7 +1159,7 @@ SCIENTIFIC SYNTHESIS:
                   type="text"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="Ask anything about tsunamis, earthquakes, climate trends, p-values..."
+                  placeholder="Ask anything about tsunamis, earthquakes, climate trends..."
                   className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
                 <button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3 rounded-xl text-xs transition cursor-pointer">
@@ -1262,9 +1168,9 @@ SCIENTIFIC SYNTHESIS:
               </form>
             </div>
 
-            {/* 3D Globe & Map Tab with NASA GIBS Multi-Layer Selector[cite: 11] */}
+            {/* 3D Globe Tab with Original WorldMap */}
             <div className={`grid-cols-1 lg:grid-cols-12 gap-6 items-stretch ${activeTab === "globe" ? "grid" : "hidden"}`}>
-              <div className="lg:col-span-6 relative">
+              <div className="lg:col-span-6">
                 <EarthGlobe3D
                   parameter={parameter}
                   regionA={regionA}
@@ -1273,50 +1179,12 @@ SCIENTIFIC SYNTHESIS:
                   rateB={dataB?.statistics.rate_per_decade}
                   unit={activeVar.unit}
                   variableLabel={activeVar.short}
-                  gibsLayer={selectedGibsLayer}
-                  gibsOpacity={layerOpacity}
                   onInspectGlobalPeak={(lat, lon, peakName) => {
                     setRegionA({ name: peakName, lat, lon });
                     setActiveBiome("global-peak");
                     setMultiScan(null);
                   }}
                 />
-
-                {/* Floating NASA GIBS Multi-Layer Selector & Opacity Slider over Globe */}
-                <div className="absolute top-4 left-4 z-30 bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-slate-700 shadow-2xl w-72 space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-sky-400 mb-1">
-                      NASA Satellite Layer
-                    </label>
-                    <select
-                      value={selectedGibsLayer}
-                      onChange={(e) => setSelectedGibsLayer(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-sky-500"
-                    >
-                      {Object.entries(NASA_GIBS_LAYERS).map(([key, layer]) => (
-                        <option key={key} value={key}>
-                          {layer.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Layer Opacity</span>
-                      <span className="text-[10px] text-sky-400 font-mono">{Math.round(layerOpacity * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="1.0"
-                      step="0.05"
-                      value={layerOpacity}
-                      onChange={(e) => setLayerOpacity(parseFloat(e.target.value))}
-                      className="w-full accent-sky-500 cursor-pointer"
-                    />
-                  </div>
-                </div>
               </div>
 
               <div className="lg:col-span-6 bg-white rounded-3xl border border-slate-200/90 p-4 shadow-2xs flex flex-col justify-between space-y-3">
@@ -1407,9 +1275,7 @@ SCIENTIFIC SYNTHESIS:
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               {synthesis.mechanism}{" "}
-              <span className="font-bold text-sky-700">
-                Next Step: {synthesis.nextStep}
-              </span>
+              <span className="font-bold text-sky-700">Next Step: {synthesis.nextStep}</span>
             </p>
           </div>
 
@@ -1418,11 +1284,7 @@ SCIENTIFIC SYNTHESIS:
               <button
                 type="button"
                 onClick={() => setChartMode("split")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  chartMode === "split"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${chartMode === "split" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"}`}
               >
                 <Columns2 className="w-3.5 h-3.5" />
                 <span>Split View</span>
@@ -1430,62 +1292,12 @@ SCIENTIFIC SYNTHESIS:
               <button
                 type="button"
                 onClick={() => setChartMode("overlay")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  chartMode === "overlay"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${chartMode === "overlay" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"}`}
               >
                 <Layers className="w-3.5 h-3.5" />
                 <span>Overlay</span>
               </button>
             </div>
-
-            <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setSeriesType("anomaly")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  seriesType === "anomaly"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
-              >
-                Anomalies
-              </button>
-              <button
-                type="button"
-                onClick={() => setSeriesType("raw")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  seriesType === "raw"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-500"
-                }`}
-              >
-                Raw Cycles
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowRolling((prev) => !prev)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                showRolling
-                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                  : "bg-white text-slate-600 border-slate-200"
-              }`}
-            >
-              12m Trend
-            </button>
-
-            <button
-              type="button"
-              onClick={exportCaseStudyBrief}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-sky-600" />
-              <span>Report</span>
-            </button>
 
             <button
               type="button"
@@ -1518,305 +1330,74 @@ SCIENTIFIC SYNTHESIS:
         {loading ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {[0, 1].map((idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-3xl border border-slate-200/80 p-6 h-[380px] animate-pulse space-y-4"
-              >
-                <div className="h-5 w-48 bg-slate-100 rounded-lg" />
-                <div className="h-10 w-32 bg-slate-100 rounded-xl" />
-                <div className="h-56 w-full bg-slate-50 rounded-2xl" />
-              </div>
+              <div key={idx} className="bg-white rounded-3xl border border-slate-200/80 p-6 h-[380px] animate-pulse space-y-4" />
             ))}
           </div>
         ) : (
-          dataA &&
-          dataB && (
-            <>
-              {chartMode === "overlay" ? (
-                <section className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-base font-extrabold text-slate-900">
-                        Direct Teleconnection Overlay: {regionA.name} vs. {regionB.name}
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        12-month smoothed anomalies &amp; linear trendlines on a unified axis (Pearson r = {pearsonR})
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs font-mono font-bold">
-                      <span className="text-sky-600">
-                        A: {dataA.statistics.rate_per_decade > 0 ? "+" : ""}
-                        {dataA.statistics.rate_per_decade} {activeVar.unit}/dec
-                      </span>
-                      <span className="text-rose-600">
-                        B: {dataB.statistics.rate_per_decade > 0 ? "+" : ""}
-                        {dataB.statistics.rate_per_decade} {activeVar.unit}/dec
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="h-[360px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={overlaySeries}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#e2e8f0"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="year"
-                          tick={{ fontSize: 11, fill: "#64748b" }}
-                          minTickGap={35}
-                        />
-                        <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: "16px",
-                            border: "1px solid #e2e8f0",
-                            fontSize: "12px",
-                          }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: "12px" }} />
-                        <ReferenceLine y={0} stroke="#94a3b8" />
-                        <Line
-                          type="monotone"
-                          dataKey="rollingA"
-                          name={`Region A 12m Anomaly (${regionA.name})`}
-                          stroke="#0284c7"
-                          strokeWidth={2.2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="trendA"
-                          name="Region A Linear Trend"
-                          stroke="#0284c7"
-                          strokeDasharray="5 5"
-                          strokeWidth={1.8}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="rollingB"
-                          name={`Region B 12m Anomaly (${regionB.name})`}
-                          stroke="#e11d48"
-                          strokeWidth={2.2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="trendB"
-                          name="Region B Linear Trend"
-                          stroke="#e11d48"
-                          strokeDasharray="5 5"
-                          strokeWidth={1.8}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-              ) : (
-                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {[
-                    {
-                      tag: "REGION A",
-                      region: regionA,
-                      data: dataA,
-                      series: enrichedSeriesA,
-                      accent: "#0284c7",
-                    },
-                    {
-                      tag: "REGION B",
-                      region: regionB,
-                      data: dataB,
-                      series: enrichedSeriesB,
-                      accent: "#e11d48",
-                    },
-                  ].map((panel) => {
-                    const stats = panel.data.statistics;
-                    const positive = stats.rate_per_decade >= 0;
-                    return (
-                      <div
-                        key={panel.tag}
-                        className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white"
-                                style={{ backgroundColor: panel.accent }}
-                              >
-                                {panel.tag}
-                              </span>
-                              <span className="text-xs font-mono text-slate-400">
-                                {panel.region.lat}°, {panel.region.lon}°
-                              </span>
-                            </div>
-                            <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                              {panel.region.name}
-                            </h3>
-                          </div>
-
-                          <div
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                              stats.is_significant
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
-                            }`}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>
-                              {stats.is_significant
-                                ? "Statistically Significant (p < 0.05)"
-                                : "Natural Variability (p >= 0.05)"}
-                            </span>
-                          </div>
+          dataA && dataB && (
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[
+                { tag: "REGION A", region: regionA, data: dataA, series: enrichedSeriesA, accent: "#0284c7" },
+                { tag: "REGION B", region: regionB, data: dataB, series: enrichedSeriesB, accent: "#e11d48" },
+              ].map((panel) => {
+                const stats = panel.data.statistics;
+                const positive = stats.rate_per_decade >= 0;
+                return (
+                  <div key={panel.tag} className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white" style={{ backgroundColor: panel.accent }}>
+                            {panel.tag}
+                          </span>
+                          <span className="text-xs font-mono text-slate-400">{panel.region.lat}°, {panel.region.lon}°</span>
                         </div>
-
-                        {/* Metric KPI Strip */}
-                        <div className="grid grid-cols-3 gap-3 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase text-slate-400">
-                              Decadal Rate
-                            </p>
-                            <p className="text-base sm:text-lg font-mono font-extrabold text-slate-900 flex items-center gap-1 mt-0.5">
-                              {positive ? (
-                                <TrendingUp className="w-4 h-4 text-rose-500" />
-                              ) : (
-                                <TrendingDown className="w-4 h-4 text-sky-600" />
-                              )}
-                              {positive ? "+" : ""}
-                              {stats.rate_per_decade}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              {activeVar.unit}/dec
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[10px] font-bold uppercase text-slate-400">
-                              Mann-Kendall Z
-                            </p>
-                            <p className="text-base sm:text-lg font-mono font-extrabold text-slate-900 mt-0.5">
-                              {stats.z_score}σ
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              p = {stats.p_value.toFixed(4)}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[10px] font-bold uppercase text-slate-400">
-                              Baseline Mean
-                            </p>
-                            <p className="text-base sm:text-lg font-mono font-extrabold text-slate-900 mt-0.5">
-                              {stats.overall_mean}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              {activeVar.unit}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Time-Series Chart */}
-                        <div className="h-[245px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            {seriesType === "anomaly" ? (
-                              <BarChart data={panel.series}>
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  stroke="#f1f5f9"
-                                  vertical={false}
-                                />
-                                <XAxis
-                                  dataKey="year"
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  minTickGap={30}
-                                />
-                                <YAxis
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    fontSize: "11px",
-                                  }}
-                                />
-                                <ReferenceLine y={0} stroke="#cbd5e1" />
-                                <Bar
-                                  dataKey="anomaly"
-                                  name={`Monthly Anomaly (${activeVar.unit})`}
-                                  radius={[2, 2, 0, 0]}
-                                >
-                                  {panel.series.map((entry, idx) => (
-                                    <Cell
-                                      key={idx}
-                                      fill={
-                                        entry.anomaly >= 0
-                                          ? "#f43f5e"
-                                          : "#0ea5e9"
-                                      }
-                                      fillOpacity={0.75}
-                                    />
-                                  ))}
-                                </Bar>
-                                {showRolling && (
-                                  <Line
-                                    type="monotone"
-                                    dataKey="rolling12m"
-                                    name="12-Month Moving Avg"
-                                    stroke="#0f172a"
-                                    strokeWidth={2}
-                                    dot={false}
-                                  />
-                                )}
-                              </BarChart>
-                            ) : (
-                              <LineChart data={panel.series}>
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  stroke="#f1f5f9"
-                                  vertical={false}
-                                />
-                                <XAxis
-                                  dataKey="year"
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  minTickGap={30}
-                                />
-                                <YAxis
-                                  tick={{ fontSize: 10, fill: "#64748b" }}
-                                  width={45}
-                                  domain={["auto", "auto"]}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    fontSize: "11px",
-                                  }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="value"
-                                  name={`Observed (${activeVar.unit})`}
-                                  stroke={panel.accent}
-                                  strokeWidth={1.75}
-                                  dot={false}
-                                />
-                              </LineChart>
-                            )}
-                          </ResponsiveContainer>
-                        </div>
+                        <h3 className="text-base font-extrabold text-slate-900 mt-1">{panel.region.name}</h3>
                       </div>
-                    );
-                  })}
-                </section>
-              )}
-            </>
+                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${stats.is_significant ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{stats.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Decadal Rate</p>
+                        <p className="text-base font-mono font-extrabold text-slate-900 flex items-center gap-1 mt-0.5">
+                          {positive ? <TrendingUp className="w-4 h-4 text-rose-500" /> : <TrendingDown className="w-4 h-4 text-sky-600" />}
+                          {positive ? "+" : ""}{stats.rate_per_decade}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Mann-Kendall Z</p>
+                        <p className="text-base font-mono font-extrabold text-slate-900 mt-0.5">{stats.z_score}σ</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Baseline Mean</p>
+                        <p className="text-base font-mono font-extrabold text-slate-900 mt-0.5">{stats.overall_mean}</p>
+                      </div>
+                    </div>
+
+                    <div className="h-[245px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={panel.series}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                          <XAxis dataKey="year" tick={{ fontSize: 10, fill: "#64748b" }} minTickGap={30} />
+                          <YAxis tick={{ fontSize: 10, fill: "#64748b" }} width={40} />
+                          <Tooltip contentStyle={{ borderRadius: "14px", border: "1px solid #e2e8f0", fontSize: "11px" }} />
+                          <ReferenceLine y={0} stroke="#cbd5e1" />
+                          <Bar dataKey="anomaly" radius={[2, 2, 0, 0]}>
+                            {panel.series.map((entry, idx) => (
+                              <Cell key={idx} fill={entry.anomaly >= 0 ? "#f43f5e" : "#0ea5e9"} fillOpacity={0.75} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
           )
         )}
       </main>
