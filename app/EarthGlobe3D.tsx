@@ -22,10 +22,11 @@ interface EarthGlobe3DProps {
   rateB?: number;
   unit: string;
   variableLabel: string;
-  gibsLayer?: string;    
+  gibsLayer?: string;
   gibsOpacity?: number;
-  showThermalHotspots?: boolean;        // Add this line
+  showThermalHotspots?: boolean;
   showOrbitingSatellites?: boolean;
+  currentYear?: number;
   onInspectGlobalPeak?: (lat: number, lon: number, name: string) => void;
 }
 
@@ -234,6 +235,8 @@ export default function EarthGlobe3D({
   rateB = 0,
   unit,
   variableLabel,
+  showThermalHotspots = true,
+  showOrbitingSatellites = true,
   onInspectGlobalPeak,
 }: EarthGlobe3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -324,6 +327,68 @@ export default function EarthGlobe3D({
       const fxGroup = new THREE.Group();
       customGroupRef.current = fxGroup;
       globe.scene().add(fxGroup);
+
+      // --- Orbiting Satellite & ISS Tracker Simulation ---
+      const satelliteMeshes: { mesh: THREE.Group; orbitRadius: number; speed: number; angle: number }[] = [];
+      if (showOrbitingSatellites) {
+        const satColors = [0x38bdf8, 0xf43f5e, 0x10b981];
+        for (let i = 0; i < 3; i++) {
+          const satGroup = new THREE.Group();
+          const bodyGeo = new THREE.BoxGeometry(1.2, 0.6, 0.6);
+          const bodyMat = new THREE.MeshBasicMaterial({ color: satColors[i] });
+          const body = new THREE.Mesh(bodyGeo, bodyMat);
+          satGroup.add(body);
+
+          // Solar panels
+          const panelGeo = new THREE.BoxGeometry(2.5, 0.1, 0.8);
+          const panelMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
+          const panel1 = new THREE.Mesh(panelGeo, panelMat);
+          panel1.position.x = 1.8;
+          const panel2 = new THREE.Mesh(panelGeo, panelMat);
+          panel2.position.x = -1.8;
+          satGroup.add(panel1);
+          satGroup.add(panel2);
+
+          fxGroup.add(satGroup);
+          satelliteMeshes.push({
+            mesh: satGroup,
+            orbitRadius: 135 + i * 14,
+            speed: 0.0008 + i * 0.0003,
+            angle: (i * Math.PI * 2) / 3,
+          });
+        }
+      }
+
+      // --- Thermal & Wildfire Hotspots Pulse Nodes ---
+      const thermalHotspotMeshes: { mesh: THREE.Mesh; maxScale: number; speed: number }[] = [];
+      if (showThermalHotspots) {
+        const hotspotCoords = [
+          { lat: 26.91, lon: 70.91 }, // Thar Desert
+          { lat: -3.11, lon: -60.02 }, // Amazon
+          { lat: 36.77, lon: -119.41 }, // California Wildfire Zone
+          { lat: -25.27, lon: 133.77 }, // Australian Outback
+        ];
+        hotspotCoords.forEach((coord, idx) => {
+          const pos = latLonToVector3(coord.lat, coord.lon, 100.8);
+          const ringGeo = new THREE.RingGeometry(1.5, 2.5, 32);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color: idx % 2 === 0 ? 0xf43f5e : 0xfbbf24,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+          });
+          const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+          ringMesh.position.copy(pos);
+          ringMesh.lookAt(pos.clone().multiplyScalar(2));
+          fxGroup.add(ringMesh);
+          thermalHotspotMeshes.push({
+            mesh: ringMesh,
+            maxScale: 2.2 + idx * 0.3,
+            speed: 0.002 + idx * 0.0005,
+          });
+        });
+      }
 
       const fallbackWeather: LiveWeatherTelemetry = {
         temperature: 26,
@@ -648,6 +713,26 @@ export default function EarthGlobe3D({
       });
 
       const tick = (time: number) => {
+        // Animate satellites
+        if (showOrbitingSatellites) {
+          satelliteMeshes.forEach((sat) => {
+            sat.angle += sat.speed;
+            const x = Math.cos(sat.angle) * sat.orbitRadius;
+            const z = Math.sin(sat.angle) * sat.orbitRadius;
+            const y = Math.sin(sat.angle * 2) * 25;
+            sat.mesh.position.set(x, y, z);
+            sat.mesh.rotation.y = -sat.angle;
+          });
+        }
+
+        // Animate thermal hotspot pulse rings
+        if (showThermalHotspots) {
+          thermalHotspotMeshes.forEach((spot, idx) => {
+            const scaleFactor = 1 + Math.sin(time * spot.speed + idx) * 0.4;
+            spot.mesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
+          });
+        }
+
         updaters.forEach((fn) => fn(time));
         animFrameRef.current = requestAnimationFrame(tick);
       };
@@ -753,7 +838,7 @@ export default function EarthGlobe3D({
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener("resize", handleResize);
     };
-  }, [parameter, regionA, regionB, rateA, rateB, unit, cfg, isHotA, isHotB, liveA, liveB, livePeak]);
+  }, [parameter, regionA, regionB, rateA, rateB, unit, cfg, isHotA, isHotB, liveA, liveB, livePeak, showThermalHotspots, showOrbitingSatellites]);
 
   const flyToGlobalPeak = () => {
     if (!globeInstanceRef.current) return;
