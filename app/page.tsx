@@ -174,6 +174,39 @@ const VARIABLES = [
   },
 ];
 
+// NASA GIBS Satellite Layers (Matching user request[cite: 11])
+const NASA_GIBS_LAYERS = {
+  none: { name: "No NASA layer", url: "" },
+  trueColor: {
+    name: "True colour (MODIS Terra)",
+    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg",
+  },
+  ndvi: {
+    name: "Vegetation NDVI (monthly)",
+    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+  },
+  landTemp: {
+    name: "Land surface temperature (monthly)",
+    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Land_Surface_Temp_Day/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+  },
+  chlorophyll: {
+    name: "Chlorophyll-a (VIIRS NOAA-20)",
+    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_Chlorophyll_A/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+  },
+  precipitation: {
+    name: "Precipitation rate (GPM IMERG)",
+    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GPM_3IMERGHHL_precipitation/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+  },
+  soilMoisture: {
+    name: "Root-zone soil moisture (SMAP L4)",
+    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Root_Zone_Soil_Moisture/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+  },
+  aerosol: {
+    name: "Aerosol optical depth (MODIS)",
+    url: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Aerosol/default/2026-11-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+  },
+};
+
 const BIOME_PRESETS = [
   {
     id: "desert-forest",
@@ -354,6 +387,10 @@ export default function ClimateDashboard() {
   const [yearStart, setYearStart] = useState<number>(1985);
   const [yearEnd, setYearEnd] = useState<number>(2025);
   const [seasonFilter, setSeasonFilter] = useState<"all" | "summer" | "winter">("all");
+
+  // NASA GIBS Map Layer State (matching user request[cite: 11])
+  const [selectedGibsLayer, setSelectedGibsLayer] = useState<string>("chlorophyll");
+  const [layerOpacity, setLayerOpacity] = useState<number>(0.8);
 
   const [aiQuery, setAiQuery] = useState<string>("");
   const [aiChatLog, setAiChatLog] = useState<{ role: string; text: string }[]>([
@@ -1225,9 +1262,9 @@ SCIENTIFIC SYNTHESIS:
               </form>
             </div>
 
-            {/* 3D Globe & Map Tab */}
+            {/* 3D Globe & Map Tab with NASA GIBS Multi-Layer Selector[cite: 11] */}
             <div className={`grid-cols-1 lg:grid-cols-12 gap-6 items-stretch ${activeTab === "globe" ? "grid" : "hidden"}`}>
-              <div className="lg:col-span-6">
+              <div className="lg:col-span-6 relative">
                 <EarthGlobe3D
                   parameter={parameter}
                   regionA={regionA}
@@ -1236,13 +1273,52 @@ SCIENTIFIC SYNTHESIS:
                   rateB={dataB?.statistics.rate_per_decade}
                   unit={activeVar.unit}
                   variableLabel={activeVar.short}
+                  gibsLayer={selectedGibsLayer}
+                  gibsOpacity={layerOpacity}
                   onInspectGlobalPeak={(lat, lon, peakName) => {
                     setRegionA({ name: peakName, lat, lon });
                     setActiveBiome("global-peak");
                     setMultiScan(null);
                   }}
                 />
+
+                {/* Floating NASA GIBS Multi-Layer Selector & Opacity Slider over Globe */}
+                <div className="absolute top-4 left-4 z-30 bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-slate-700 shadow-2xl w-72 space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-sky-400 mb-1">
+                      NASA Satellite Layer
+                    </label>
+                    <select
+                      value={selectedGibsLayer}
+                      onChange={(e) => setSelectedGibsLayer(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                    >
+                      {Object.entries(NASA_GIBS_LAYERS).map(([key, layer]) => (
+                        <option key={key} value={key}>
+                          {layer.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Layer Opacity</span>
+                      <span className="text-[10px] text-sky-400 font-mono">{Math.round(layerOpacity * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={layerOpacity}
+                      onChange={(e) => setLayerOpacity(parseFloat(e.target.value))}
+                      className="w-full accent-sky-500 cursor-pointer"
+                    />
+                  </div>
+                </div>
               </div>
+
               <div className="lg:col-span-6 bg-white rounded-3xl border border-slate-200/90 p-4 shadow-2xs flex flex-col justify-between space-y-3">
                 <div className="relative z-30 flex flex-wrap items-center gap-2">
                   <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">

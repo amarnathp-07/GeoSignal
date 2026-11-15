@@ -22,6 +22,8 @@ interface EarthGlobe3DProps {
   rateB?: number;
   unit: string;
   variableLabel: string;
+  gibsLayer?: string;    
+  gibsOpacity?: number;
   onInspectGlobalPeak?: (lat: number, lon: number, name: string) => void;
 }
 
