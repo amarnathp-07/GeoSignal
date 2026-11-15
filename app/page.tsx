@@ -1177,7 +1177,7 @@ SCIENTIFIC SYNTHESIS:
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-600 text-white uppercase">
                     Severe Warning
                   </span>
-                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude $\ge$ 7.0 / Subduction</p>
+                  <p className="text-xs font-extrabold text-slate-900 mt-2">Magnitude ≥ 7.0 / Subduction</p>
                   <p className="text-[11px] text-slate-600 mt-0.5">Triggers immediate hydrodynamic sea-flow runup simulations and evacuation alerts.</p>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
