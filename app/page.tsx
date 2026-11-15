@@ -756,11 +756,8 @@ SCIENTIFIC SYNTHESIS:
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
-                  GeoSignal — Earth System Trend Detective Lab
+                  GeoSignal — Earth System Trend Detective
                 </h1>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/80">
-                  NASA Space Apps Challenge
-                </span>
               </div>
               <p className="text-xs text-slate-500">
                 Multi-Decadal Satellite Telemetry, Mann-Kendall Statistics &amp; Disaster Early Warning
@@ -861,7 +858,7 @@ SCIENTIFIC SYNTHESIS:
               <div>
                 <h4 className="font-extrabold text-slate-900 mb-1">2. Mann-Kendall &amp; Sen’s Slope Statistics</h4>
                 <p>
-                  To separate genuine climate trajectories from natural interannual variability, our backend computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at the standard $p &lt; 0.05$ threshold.
+                  To separate genuine climate trajectories from natural interannual variability, our backend computes non-parametric Mann-Kendall Z-scores and Sen&apos;s slope linear rates, flagging significance at the standard p &lt; 0.05 threshold.
                 </p>
               </div>
               <div>
