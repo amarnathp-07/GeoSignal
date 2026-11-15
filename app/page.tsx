@@ -444,6 +444,103 @@ function generateScientificHypothesis(
   };
 }
 
+interface LatestConditionsGridProps {
+  dataA: AnalysisResponse | null;
+  dataB: AnalysisResponse | null;
+  regionAName: string;
+  regionBName: string;
+  isDarkMode: boolean;
+}
+
+function LatestConditionsGrid({ dataA, dataB, regionAName, regionBName, isDarkMode }: LatestConditionsGridProps) {
+  if (!dataA || !dataB || !dataA.time_series.length) return null;
+
+  const latestA = dataA.time_series[dataA.time_series.length - 1];
+  const latestB = dataB.time_series[dataB.time_series.length - 1];
+
+  const cards = [
+    {
+      title: "SURFACE AIR TEMP (PIN A)",
+      val: latestA.value,
+      unit: "°C",
+      sub: `${regionAName}`,
+      vs: `${dataA.statistics.rate_per_decade > 0 ? "+" : ""}${dataA.statistics.rate_per_decade}°C/dec`,
+      trend: dataA.statistics.rate_per_decade >= 0 ? "up" : "down",
+      color: "text-amber-400",
+    },
+    {
+      title: "SURFACE AIR TEMP (PIN B)",
+      val: latestB.value,
+      unit: "°C",
+      sub: `${regionBName}`,
+      vs: `${dataB.statistics.rate_per_decade > 0 ? "+" : ""}${dataB.statistics.rate_per_decade}°C/dec`,
+      trend: dataB.statistics.rate_per_decade >= 0 ? "up" : "down",
+      color: "text-rose-400",
+    },
+    {
+      title: "MAN-KENDALL Z-SCORE (A)",
+      val: dataA.statistics.z_score,
+      unit: "σ",
+      sub: `p = ${dataA.statistics.p_value.toFixed(3)}`,
+      vs: dataA.statistics.is_significant ? "Significant" : "Noise",
+      trend: "up",
+      color: "text-sky-400",
+    },
+    {
+      title: "MAN-KENDALL Z-SCORE (B)",
+      val: dataB.statistics.z_score,
+      unit: "σ",
+      sub: `p = ${dataB.statistics.p_value.toFixed(3)}`,
+      vs: dataB.statistics.is_significant ? "Significant" : "Noise",
+      trend: "up",
+      color: "text-indigo-400",
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className={`text-xs font-extrabold uppercase tracking-widest ${isDarkMode ? "text-slate-400" : "text-slate-600"}`}>
+          Latest Conditions &amp; Multi-Parameter Metrics (2026-11)
+        </h3>
+        <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border ${isDarkMode ? "bg-slate-900 border-slate-700 text-sky-400" : "bg-white border-slate-200 text-sky-700"}`}>
+          Live Reanalysis Sync
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map((c, i) => (
+          <div
+            key={i}
+            className={`rounded-3xl p-5 border shadow-xs transition flex flex-col justify-between ${
+              isDarkMode ? "bg-slate-900/90 border-slate-800 text-white" : "bg-white border-slate-200/90 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{c.title}</span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800/40 text-slate-300 border border-slate-700/50`}>
+                HISTORICAL
+              </span>
+            </div>
+
+            <div className="my-3">
+              <div className={`text-2xl font-extrabold font-mono ${c.color}`}>
+                {c.val} <span className="text-xs font-normal text-slate-400">{c.unit}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5 truncate">{c.sub}</p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-400">Trend Rate</span>
+              <span className="font-bold text-sky-400">{c.vs}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ClimateDashboard() {
   const [parameter, setParameter] = useState<string>("T2M");
   const [regionA, setRegionA] = useState({
@@ -1338,6 +1435,15 @@ export default function ClimateDashboard() {
             </div>
           </div>
         </section>
+
+        {/* Latest Conditions Dashboard Cards Grid */}
+        <LatestConditionsGrid
+          dataA={dataA}
+          dataB={dataB}
+          regionAName={regionA.name}
+          regionBName={regionB.name}
+          isDarkMode={isDarkMode}
+        />
 
         {/* Hero Spatial Stage: Instant Tab Switcher */}
         <section ref={globeSectionRef} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
