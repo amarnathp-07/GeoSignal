@@ -41,6 +41,7 @@ import {
   Info,
   X,
   ShieldCheck,
+  Printer,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -590,6 +591,73 @@ SCIENTIFIC SYNTHESIS:
     a.download = `NASA_Trend_Brief_${parameter}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // ONE-CLICK EXECUTIVE PDF BRIEF EXPORT (Opens professional print view for PDF saving)
+  const exportPDFReport = () => {
+    if (!dataA || !dataB) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to export the PDF brief.");
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>GeoSignal NASA Space Apps - Executive PDF Brief</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; padding: 40px; line-height: 1.5; }
+            h1 { font-size: 22px; color: #0284c7; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 5px; }
+            .subtitle { font-size: 12px; color: #64748b; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 1px; }
+            .section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            h3 { font-size: 14px; text-transform: uppercase; color: #334155; margin-top: 0; }
+            .metric { font-size: 18px; font-weight: bold; color: #0f172a; margin: 5px 0; font-family: monospace; }
+            .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; background: #e0f2fe; color: #0369a1; }
+            .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; paddingTop: 15px; }
+          </style>
+        </head>
+        <body>
+          <h1>GeoSignal — Earth System Trend Detective Brief</h1>
+          <div class="subtitle">NASA Space Apps Challenge • Variable: ${activeVar.label} (${parameter}) • Window: ${yearStart}–${yearEnd}</div>
+          
+          <div class="section">
+            <h3>Executive Scientific Synthesis</h3>
+            <p><strong>${synthesis.headline}</strong></p>
+            <p>${synthesis.mechanism}</p>
+            <p><em>Cross-Region Pearson Correlation (r): <strong>${pearsonR}</strong></em></p>
+          </div>
+
+          <div class="grid">
+            <div class="section">
+              <h3>Region A: ${regionA.name}</h3>
+              <div class="metric">Rate: ${dataA.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
+              <p>Mann-Kendall Z: ${dataA.statistics.z_score}σ (p = ${dataA.statistics.p_value})</p>
+              <span class="badge">${dataA.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}</span>
+            </div>
+
+            <div class="section">
+              <h3>Region B: ${regionB.name}</h3>
+              <div class="metric">Rate: ${dataB.statistics.rate_per_decade} ${activeVar.unit}/dec</div>
+              <p>Mann-Kendall Z: ${dataB.statistics.z_score}σ (p = ${dataB.statistics.p_value})</p>
+              <span class="badge">${dataB.statistics.is_significant ? "Statistically Significant (p < 0.05)" : "Natural Variability"}</span>
+            </div>
+          </div>
+
+          <div class="footer">
+            Generated via GeoSignal (geosignal2.vercel.app) • Powered by NASA POWER Reanalysis &amp; USGS Seismic Telemetry
+          </div>
+          <script>
+            window.onload = function() { window.print(); };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const exportMergedCSV = () => {
@@ -1262,6 +1330,15 @@ SCIENTIFIC SYNTHESIS:
             >
               <FileText className="w-3.5 h-3.5 text-sky-600" />
               <span>Report</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={exportPDFReport}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-sky-600 text-white hover:bg-sky-500 transition cursor-pointer shadow-xs"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>PDF Brief</span>
             </button>
 
             <button
