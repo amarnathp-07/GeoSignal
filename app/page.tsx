@@ -52,6 +52,10 @@ import {
   Compass,
   Navigation,
   Clock,
+  Volume2,
+  VolumeX,
+  Sliders,
+  ShieldAlert,
 } from "lucide-react";
 
 const EarthGlobe3D = dynamic(() => import("./EarthGlobe3D"), {
@@ -541,6 +545,31 @@ function LatestConditionsGrid({ dataA, dataB, regionAName, regionBName, isDarkMo
   );
 }
 
+function CrisisAlertBanner({ dataA, regionName, isDarkMode }: { dataA: AnalysisResponse | null; regionName: string; isDarkMode: boolean }) {
+  if (!dataA) return null;
+  const isSevere = Math.abs(dataA.statistics.rate_per_decade) > 0.3 && dataA.statistics.is_significant;
+  if (!isSevere) return null;
+
+  return (
+    <div className={`p-4 rounded-3xl border flex items-center justify-between gap-4 shadow-md ${isDarkMode ? "bg-rose-950/60 border-rose-800 text-rose-200" : "bg-rose-50 border-rose-200 text-rose-900"}`}>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-rose-500 text-white flex items-center justify-center font-bold shrink-0 animate-pulse">
+          <ShieldAlert className="w-5 h-5" />
+        </div>
+        <div>
+          <h4 className="text-xs font-extrabold uppercase tracking-widest">Automated Climate Risk Trigger</h4>
+          <p className="text-xs mt-0.5">
+            Statistical anomaly detected in <strong>{regionName}</strong>: Decadal shift of {dataA.statistics.rate_per_decade} {dataA.region.units} exceeds normal baseline variance ($p &lt; 0.05$).
+          </p>
+        </div>
+      </div>
+      <span className="text-[10px] font-mono px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 uppercase font-bold shrink-0">
+        Action Required
+      </span>
+    </div>
+  );
+}
+
 export default function ClimateDashboard() {
   const [parameter, setParameter] = useState<string>("T2M");
   const [regionA, setRegionA] = useState({
@@ -579,6 +608,10 @@ export default function ClimateDashboard() {
   const [yearEnd, setYearEnd] = useState<number>(2025);
   const [seasonFilter, setSeasonFilter] = useState<"all" | "summer" | "winter">("all");
 
+  const [projectionYear, setProjectionYear] = useState<number>(2050);
+  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
   const [aiQuery, setAiQuery] = useState<string>("");
   const [aiChatLog, setAiChatLog] = useState<{ role: string; text: string }[]>([
     { role: "assistant", text: "Hello! I am GeoSignal AI. Ask me anything about satellite anomalies, local AM/PM times, inter-region distances, or Mann-Kendall statistics!" }
@@ -603,6 +636,35 @@ export default function ClimateDashboard() {
 
   const timeA = useMemo(() => getLocalTimeForRegion(regionA.lat, regionA.lon), [regionA]);
   const timeB = useMemo(() => getLocalTimeForRegion(regionB.lat, regionB.lon), [regionB]);
+
+  // Audio Soundscape Synthesizer
+  const toggleSoundscape = () => {
+    if (isPlayingAudio) {
+      audioCtxRef.current?.close();
+      audioCtxRef.current = null;
+      setIsPlayingAudio(false);
+    } else {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      audioCtxRef.current = ctx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const rate = dataA?.statistics.rate_per_decade || 0.1;
+      osc.frequency.setValueAtTime(180 + Math.abs(rate) * 350, ctx.currentTime);
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      setIsPlayingAudio(true);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      audioCtxRef.current?.close();
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -842,6 +904,12 @@ export default function ClimateDashboard() {
     return { totalExposed: formatted, vulnerability };
   }, [dataA]);
 
+  const projectedValueA = useMemo(() => {
+    if (!dataA) return 0;
+    const yearsAhead = projectionYear - 2025;
+    return Number((dataA.statistics.overall_mean + dataA.statistics.slope_per_year * (2025 - 1985 + yearsAhead)).toFixed(2));
+  }, [dataA, projectionYear]);
+
   const synthesis = useMemo(
     () =>
       generateScientificHypothesis(
@@ -1043,6 +1111,21 @@ export default function ClimateDashboard() {
               </button>
             </div>
 
+            {/* Listen to the Planet Soundscape Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleSoundscape}
+              title="Listen to planetary audio soundscape"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                isPlayingAudio
+                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse"
+                  : isDarkMode ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {isPlayingAudio ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4" />}
+              <span>{isPlayingAudio ? "Playing Soundscape" : "Listen to Planet"}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setIsDarkMode((prev) => !prev)}
@@ -1160,6 +1243,9 @@ export default function ClimateDashboard() {
       )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6">
+
+        {/* Crisis Automated Risk Alert Banner */}
+        <CrisisAlertBanner dataA={dataA} regionName={regionA.name} isDarkMode={isDarkMode} />
         
         {/* Explicit 5-Step Trend Detective Workflow Bar */}
         <section className={`rounded-3xl p-5 shadow-lg border ${isDarkMode ? "bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 border-slate-700 text-white" : "bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white border-slate-700"}`}>
@@ -1629,6 +1715,36 @@ export default function ClimateDashboard() {
               </div>
             </div>
 
+          </div>
+        </section>
+
+        {/* 2050 Future Climate Projection Simulator */}
+        <section className={`rounded-3xl border p-5 shadow-2xs flex flex-wrap items-center justify-between gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+              <Sliders className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                Future Climate Simulator (Linear Trend Projection to {projectionYear})
+              </h3>
+              <p className="text-sm font-bold mt-0.5">
+                Projected {activeVar.short} for {regionA.name}: <span className="font-mono text-indigo-400">{projectedValueA} {activeVar.unit}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-slate-400">Target Year:</span>
+            <select
+              value={projectionYear}
+              onChange={(e) => setProjectionYear(Number(e.target.value))}
+              className={`px-3 py-1.5 rounded-xl border font-mono font-bold ${isDarkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`}
+            >
+              <option value={2030}>2030</option>
+              <option value={2040}>2040</option>
+              <option value={2050}>2050</option>
+              <option value={2100}>2100</option>
+            </select>
           </div>
         </section>
 
