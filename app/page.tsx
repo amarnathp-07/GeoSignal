@@ -382,13 +382,13 @@ export default function ClimateDashboard() {
       setLoading(true);
       setError(null);
       try {
-       const [resA, resB] = await Promise.all([
+        const [resA, resB] = await Promise.all([
           fetch(`/api/analyze?lat=${latA}&lon=${lonA}&parameter=${param}`),
           fetch(`/api/analyze?lat=${latB}&lon=${lonB}&parameter=${param}`),
         ]);
         if (!resA.ok || !resB.ok) {
           throw new Error(
-            "Unable to reach FastAPI NASA engine. Ensure uvicorn is running on port 8000."
+            "Unable to fetch NASA POWER analytics from API route."
           );
         }
         const [jsonA, jsonB]: [AnalysisResponse, AnalysisResponse] =
@@ -422,7 +422,7 @@ export default function ClimateDashboard() {
       const results = await Promise.all(
         VARIABLES.map(async (v) => {
           const res = await fetch(
-            `http://127.0.0.1:8000/api/analyze?lat=${regionA.lat}&lon=${regionA.lon}&parameter=${v.id}`
+            `/api/analyze?lat=${regionA.lat}&lon=${regionA.lon}&parameter=${v.id}`
           );
           const json: AnalysisResponse = await res.json();
           return {
@@ -534,7 +534,6 @@ export default function ClimateDashboard() {
     [parameter, regionA, regionB, dataA, dataB, pearsonR]
   );
 
-  // DYNAMIC CONTEXT-AWARE AI ASSISTANT HANDLER
   const handleAIChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiQuery.trim()) return;
