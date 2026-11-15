@@ -31,7 +31,6 @@ import {
   FileText,
   Layers,
   Columns2,
-  Presentation,
   Activity,
   AlertCircle,
   CheckCircle2,
@@ -230,9 +229,8 @@ const BIOME_PRESETS = [
   },
 ];
 
-// Great-circle distance calculator in km and miles
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -250,9 +248,7 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
   };
 }
 
-// Helper to get local time based on region country/timezone or coordinate fallback
 function getLocalTimeForRegion(lat: number, lon: number) {
-  // If both locations are roughly within India bounds (approx lat 6°N to 37°N, lon 68°E to 97°E), use IST
   const isIndia = lat >= 6 && lat <= 37 && lon >= 68 && lon <= 97;
   const timeZone = isIndia ? "Asia/Kolkata" : undefined;
 
@@ -265,7 +261,6 @@ function getLocalTimeForRegion(lat: number, lon: number) {
     });
   }
 
-  // General longitude offset fallback for international locations
   const now = new Date();
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
   const offsetHours = lon / 15;
@@ -360,10 +355,7 @@ function computeEnrichedSeries(
   });
 }
 
-function computePearsonCorrelation(
-  a: EnrichedPoint[],
-  b: EnrichedPoint[]
-): number {
+function computePearsonCorrelation(a: EnrichedPoint[], b: EnrichedPoint[]): number {
   const n = Math.min(a.length, b.length);
   if (n < 6) return 0;
   let sumX = 0,
@@ -477,7 +469,6 @@ export default function ClimateDashboard() {
   const [presentationMode, setPresentationMode] = useState<boolean>(false);
   const [showMethodologyModal, setShowMethodologyModal] = useState<boolean>(false);
   
-  // Enhancement states
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [showCoordModal, setShowCoordModal] = useState<boolean>(false);
   const [customLat, setCustomLat] = useState<string>("13.93");
@@ -485,9 +476,7 @@ export default function ClimateDashboard() {
   const [customName, setCustomName] = useState<string>("Custom Lat/Lon Pin");
   const [savedPresets, setSavedPresets] = useState<{ name: string; lat: number; lon: number; param: string }[]>([]);
 
-  // Disaster Expansion specific states
   const [showTsunamiRings, setShowTsunamiRings] = useState<boolean>(true);
-
   const [activeTab, setActiveTab] = useState<"globe" | "tsunami" | "ai">("globe");
   const [yearStart, setYearStart] = useState<number>(1985);
   const [yearEnd, setYearEnd] = useState<number>(2025);
@@ -511,7 +500,6 @@ export default function ClimateDashboard() {
 
   const activeVar = VARIABLES.find((v) => v.id === parameter) || VARIABLES[0];
 
-  // Calculated distance and correct local times
   const interRegionDistance = useMemo(() => {
     return calculateHaversineDistance(regionA.lat, regionA.lon, regionB.lat, regionB.lon);
   }, [regionA, regionB]);
