@@ -1,7 +1,6 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  output: "export",
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Remove any line that says output: 'export'
 };
 
-export default nextConfig;
+module.exports = nextConfig;
